@@ -8,7 +8,7 @@
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;padding:24px;color:#1a202c}
-  .container{max-width:1200px;margin:0 auto}
+  .container{max-width:1240px;margin:0 auto}
   .header{text-align:center;color:#fff;margin-bottom:32px}
   .header h1{font-size:32px;margin-bottom:8px}
   .header p{opacity:.9;font-size:14px}
@@ -18,13 +18,14 @@
   .upload-card:hover{transform:translateY(-2px)}
   .upload-card.pot{border-top-color:#e53e3e}
   .upload-card.seg{border-top-color:#3182ce}
-  .upload-card h2{font-size:18px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .upload-card h2{font-size:18px;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .upload-card.pot h2{color:#c53030}
   .upload-card.seg h2{color:#2b6cb0}
   .upload-card .desc{font-size:13px;color:#718096;margin-bottom:16px;line-height:1.5}
   .badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;margin-left:4px}
   .badge.red{background:#fff5f5;color:#c53030}
   .badge.blue{background:#ebf8ff;color:#2b6cb0}
+  .badge.purple{background:#faf5ff;color:#6b46c1}
   .drop-zone{border:2px dashed #cbd5e0;border-radius:12px;padding:24px;text-align:center;cursor:pointer;transition:all .2s}
   .drop-zone:hover,.drop-zone.dragover{border-color:#667eea;background:#f7fafc}
   .upload-card.pot .drop-zone:hover,.upload-card.pot .drop-zone.dragover{border-color:#e53e3e;background:#fff5f5}
@@ -62,17 +63,23 @@
   .stage.done .indicator{background:#38a169}
   .stage.error .indicator{background:#e53e3e}
   @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
-  .stage .text{font-size:14px;color:#2d3748;font-weight:500}
-  .stage .detail{font-size:12px;color:#718096;margin-left:auto;font-weight:600}
+  .stage .text{font-size:14px;color:#2d3748;font-weight:500;flex:1}
+  .stage .detail{font-size:12px;color:#718096;font-weight:600;text-align:right}
   .result-card{background:#fff;border-radius:16px;padding:28px;box-shadow:0 10px 30px rgba(0,0,0,.15);display:none}
   .result-card.show{display:block;animation:slideUp .5s ease}
   @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
   .result-card h2{font-size:20px;margin-bottom:16px;color:#2d3748;display:flex;align-items:center;gap:8px}
-  .result-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
-  @media(max-width:600px){.result-stats{grid-template-columns:1fr}}
+  .result-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+  @media(max-width:700px){.result-stats{grid-template-columns:repeat(2,1fr)}}
   .stat{padding:16px;background:#f7fafc;border-radius:10px;text-align:center}
   .stat .num{font-size:24px;font-weight:700;color:#667eea}
   .stat .lbl{font-size:12px;color:#718096;margin-top:4px}
+  .stat.integrity-ok{background:#f0fff4}
+  .stat.integrity-ok .num{color:#38a169}
+  .stat.integrity-warn{background:#fffaf0}
+  .stat.integrity-warn .num{color:#d69e2e}
+  .stat.dup-info{background:#faf5ff}
+  .stat.dup-info .num{color:#6b46c1}
   .preview-toggle{color:#3182ce;cursor:pointer;font-size:13px;font-weight:600;margin-right:12px;display:inline-block;margin-bottom:12px}
   .preview{display:none;overflow:auto;margin-bottom:16px;max-height:360px;border-radius:8px;border:1px solid #e2e8f0}
   .preview.show{display:block}
@@ -84,10 +91,43 @@
   .toast.show{display:block;animation:slideIn .3s ease}
   .toast.error{border-left-color:#e53e3e;color:#c53030}
   .toast.success{border-left-color:#38a169;color:#2f855a}
+  .toast.warn{border-left-color:#d69e2e;color:#b7791f}
   @keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}
   .warn-note{background:#fffaf0;border:1px solid #fbd38d;color:#975a16;padding:12px 16px;border-radius:10px;font-size:13px;margin-top:16px}
-  .alias-note{background:#ebf8ff;border:1px solid #90cdf4;color:#2c5282;padding:12px 16px;border-radius:10px;font-size:12px;margin-top:16px}
+  .alias-note{background:#ebf8ff;border:1px solid #90cdf4;color:#2c5282;padding:12px 16px;border-radius:10px;font-size:12px;margin-top:16px;line-height:1.8}
   .alias-note code{background:#fff;padding:1px 6px;border-radius:4px;color:#2b6cb0}
+  .key-note{background:#faf5ff;border:1px solid #d6bcfa;color:#553c9a;padding:12px 16px;border-radius:10px;font-size:12px;margin-top:12px;line-height:1.7}
+  .key-note code{background:#fff;padding:1px 6px;border-radius:4px;color:#6b46c1}
+  .flow-note{background:#f0fff4;border:1px solid #9ae6b4;color:#22543d;padding:12px 16px;border-radius:10px;font-size:12px;margin-top:12px;line-height:1.7}
+  .flow-note code{background:#fff;padding:1px 6px;border-radius:4px;color:#276749}
+  .integrity-note{background:#f7fafc;border:1px solid #cbd5e0;color:#2d3748;padding:12px 16px;border-radius:10px;font-size:12px;margin-top:12px;line-height:1.8}
+  .integrity-note code{background:#fff;padding:1px 6px;border-radius:4px;color:#4a5568}
+  .integrity-note.ok{background:#f0fff4;border-color:#9ae6b4;color:#22543d}
+  .integrity-note.ok code{color:#276749}
+  .integrity-note.warn{background:#fffaf0;border-color:#fbd38d;color:#975a16}
+  .integrity-note.warn code{color:#975a16}
+  .dup-note{background:#faf5ff;border:1px solid #d6bcfa;color:#553c9a;padding:12px 16px;border-radius:10px;font-size:12px;margin-top:12px;line-height:1.8}
+  .dup-note code{background:#fff;padding:1px 6px;border-radius:4px;color:#6b46c1}
+  details.panel{background:#f7fafc;border:1px solid #e2e8f0;border-radius:10px;margin-top:12px;padding:0;overflow:hidden}
+  details.panel summary{padding:12px 16px;cursor:pointer;font-size:13px;font-weight:600;color:#2d3748;user-select:none;transition:background .15s}
+  details.panel summary:hover{background:#edf2f7}
+  details.panel[open] summary{border-bottom:1px solid #e2e8f0;background:#edf2f7}
+  details.panel .panel-body{padding:12px 16px;font-size:12px;color:#4a5568}
+  details.panel .panel-body pre{background:#fff;padding:12px;border-radius:6px;overflow:auto;max-height:300px;font-family:'Consolas',monospace;font-size:11px;line-height:1.5;color:#2d3748;white-space:pre-wrap;word-break:break-all}
+  .mapping-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+  .mapping-table th,.mapping-table td{padding:6px 10px;border-bottom:1px solid #e2e8f0;text-align:left}
+  .mapping-table th{background:#edf2f7;font-weight:600;color:#4a5568}
+  .mapping-table td.matched{color:#2f855a;font-weight:600}
+  .mapping-table td.unmatched{color:#c53030;font-weight:600}
+  .mapping-table td.source{color:#2b6cb0;font-family:'Consolas',monospace;font-size:11px}
+  .mapping-table .tr-seg{background:#ebf8ff}
+  .mapping-table .tr-pot{background:#fffaf0}
+  .mapping-table .tr-sdl{background:#f0fff4}
+  .mapping-table .tr-cross{background:#faf5ff}
+  .btn-small{padding:6px 14px;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer;background:#3182ce;color:#fff;font-family:inherit}
+  .btn-small:hover{background:#2b6cb0}
+  .cdn-warn{background:#fff5f5;border:1px solid #fed7d7;color:#c53030;padding:12px 16px;border-radius:10px;font-size:13px;margin-top:16px;display:none}
+  .cdn-warn.show{display:block}
 </style>
 </head>
 <body>
@@ -95,12 +135,20 @@
   <div class="header">
     <h1>⚡ BCP Compiler</h1>
     <p>Kompilasi <b>POT Analysis Report</b> + <b>Segmentation Info</b> → Sheet <code>bcp_segmentation_export_sheet</code> & <code>bcp_diagram_export_sheet</code></p>
+    <p style="margin-top:8px;font-size:12px;opacity:.85">🔁 Duplikat dipertahankan · 1 baris Site Down List = 1 baris output (tanpa pengurangan)</p>
+  </div>
+
+  <div class="cdn-warn" id="cdn-warn">
+    ⚠️ <b>SheetJS gagal dimuat dari semua CDN.</b> Periksa koneksi internet atau firewall Anda.
   </div>
 
   <div class="upload-grid">
     <div class="upload-card pot">
-      <h2>🔴 File 1 — POT Analysis Report <span class="badge red">WAJIB</span></h2>
-      <div class="desc">Berisi sheet <b>Summary Report</b> (untuk bcp_diagram) dan detail alarm per site (kolom <code>First Occurrence</code>, <code>Last Occurrence</code>, <code>Alarm</code>, dll).</div>
+      <h2>🔴 File 1 — POT Analysis Report <span class="badge purple">SUMBER UTAMA</span></h2>
+      <div class="desc">
+        Berisi <b>Summary Report</b> (→ bcp_diagram), <b>Site Down List</b> (sumber baris & kolom <code>Key</code>, <code>First Occurred</code>, <code>Alarm</code>, <code>BTS Name</code>, <code>Hub Type</code>, <code>Power Alarm*</code>), dan detail alarm.
+        <br><small>✅ Semua baris Site Down List dijamin 1:1 ke output, termasuk duplikat.</small>
+      </div>
       <label class="drop-zone" id="dz-pot">
         <input type="file" id="file-pot" accept=".xlsx,.xls,.csv">
         <div class="icon">📕</div>
@@ -115,8 +163,10 @@
     </div>
 
     <div class="upload-card seg">
-      <h2>🔵 File 2 — Segmentation Info <span class="badge blue">WAJIB</span></h2>
-      <div class="desc">Berisi informasi site: <code>Site ID</code>, Old Site Id, BTS Name, Tech, IP OAM, Region, City, Area, Province, VIP, dll.</div>
+      <h2>🔵 File 2 — Segmentation Info <span class="badge blue">ENRICH</span></h2>
+      <div class="desc">
+        Melengkapi kolom lain (Old Site Id, System, Tech, IP OAM, Region, City, Area, Province, VIP, dll) berdasarkan <code>Site Id</code> dari Site Down List.
+      </div>
       <label class="drop-zone" id="dz-seg">
         <input type="file" id="file-seg" accept=".xlsx,.xls,.csv">
         <div class="icon">📘</div>
@@ -140,7 +190,7 @@
     <div class="stages">
       <div class="stage" id="stage-pot"><div class="indicator">1</div><div class="text">Membaca POT Analysis Report</div><div class="detail" id="det-pot"></div></div>
       <div class="stage" id="stage-seg"><div class="indicator">2</div><div class="text">Membaca Segmentation Info</div><div class="detail" id="det-seg"></div></div>
-      <div class="stage" id="stage-match"><div class="indicator">3</div><div class="text">Mencocokkan kolom antar file</div><div class="detail" id="det-match"></div></div>
+      <div class="stage" id="stage-match"><div class="indicator">3</div><div class="text">Menentukan base (Site Down List) & membangun lookup</div><div class="detail" id="det-match"></div></div>
       <div class="stage" id="stage-build"><div class="indicator">4</div><div class="text">Membangun sheet bcp_segmentation_export_sheet</div><div class="detail" id="det-build"></div></div>
       <div class="stage" id="stage-summary"><div class="indicator">5</div><div class="text">Menyalin Summary Report → bcp_diagram_export_sheet</div><div class="detail" id="det-summary"></div></div>
       <div class="stage" id="stage-excel"><div class="indicator">6</div><div class="text">Menyusun file Excel output</div><div class="detail" id="det-excel"></div></div>
@@ -151,8 +201,9 @@
     <h2>✅ Kompilasi Selesai</h2>
     <div class="result-stats">
       <div class="stat"><div class="num" id="stat-diag">0</div><div class="lbl">Baris · bcp_diagram</div></div>
-      <div class="stat"><div class="num" id="stat-seg">0</div><div class="lbl">Baris · bcp_segmentation</div></div>
-      <div class="stat"><div class="num" id="stat-matched">0</div><div class="lbl">Kolom ter-match</div></div>
+      <div class="stat" id="stat-base-card"><div class="num" id="stat-base">0</div><div class="lbl">Baris · Site Down List (base)</div></div>
+      <div class="stat" id="stat-output-card"><div class="num" id="stat-output">0</div><div class="lbl">Baris · Output</div></div>
+      <div class="stat dup-info"><div class="num" id="stat-dup">0</div><div class="lbl">Duplikat (dipertahankan)</div></div>
     </div>
     <span class="preview-toggle" onclick="togglePreview('prev-diag')">👁 Preview bcp_diagram</span>
     <span class="preview-toggle" onclick="togglePreview('prev-seg')">👁 Preview bcp_segmentation</span>
@@ -162,36 +213,94 @@
       <button class="btn btn-download" onclick="downloadOutput()">⬇️ Download File Excel</button>
       <button class="btn btn-reset" onclick="resetAll()">🔄 Mulai Ulang</button>
     </div>
-    <div class="alias-note">
-      🔗 <b>Alias aktif:</b>
-      <code>First Occurred(NT)</code> ↔ <code>First Occurrence</code> ·
-      <code>Last Occurred(NT)</code> ↔ <code>Last Occurrence</code> ·
-      <code>Site Id</code> ↔ <code>Site ID</code>
+    <div class="integrity-note" id="integrity-note">🛡️ <b>Data integrity:</b> memverifikasi jumlah baris...</div>
+    <div class="dup-note" id="dup-note">🔁 <b>Duplikat:</b> menghitung...</div>
+    <div class="flow-note" id="flow-note">
+      🧭 <b>Alur:</b> setiap baris <code>Site Down List</code> → 1 baris output · kolom tertentu diambil langsung dari Site Down List · kolom lain diperkaya dari Segmentation Info & POT detail.
     </div>
-    <div class="warn-note">💡 Jika masih ada kolom kosong, cek nama kolom di file sumber. Tambahkan alias baru di konstanta <code>COL_ALIASES</code>.</div>
+    <div class="key-note" id="key-note">🔑 <b>Key:</b> sedang menentukan sumber...</div>
+    <div class="alias-note">
+      🔗 <b>Cross-map & alias aktif:</b><br>
+      🔀 <code>First Occurred(NT)</code> ← <code>Last Occurred(NT)</code> di <b>Site Down List</b><br>
+      🟢 <code>Key</code>, <code>Alarm</code>, <code>Site Id</code>, <code>BTS Name</code>, <code>Hub Type</code>, <code>Power Alarm Name</code>, <code>Power Alarm Time</code> ← hanya dari <b>Site Down List</b><br>
+      🔵 Kolom lain (Old Site Id, System, Tech, IP OAM, Last Occurred(NT), Alarm Identifier, TT, WO, Mains Failure, dll) ← dari Segmentation Info & POT detail<br>
+      📝 Alias: <code>Site Id</code> ↔ <code>Site ID</code>
+    </div>
+
+    <details class="panel" id="mapping-panel">
+      <summary>🔗 Column Mapping (klik untuk lihat detail)</summary>
+      <div class="panel-body">
+        <table class="mapping-table">
+          <thead><tr><th>Kolom Template</th><th>Kolom Asli</th><th>Sumber</th><th>Status</th></tr></thead>
+          <tbody id="mapping-body"></tbody>
+        </table>
+      </div>
+    </details>
+
+    <details class="panel" id="debug-panel">
+      <summary>🐛 Debug Log (klik untuk lihat)</summary>
+      <div class="panel-body">
+        <pre id="debug-content"></pre>
+        <div style="margin-top:10px;text-align:right">
+          <button class="btn-small" onclick="downloadLog()">⬇️ Download Log</button>
+        </div>
+      </div>
+    </details>
+
+    <div class="warn-note">💡 Jika ada kolom kosong, cek mapping table & debug log — bisa jadi nama kolom sumber tidak terdeteksi.</div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-/* ============== KONSTANTA TEMPLATE ============== */
+/* ============================================================
+   KONSTANTA TEMPLATE
+============================================================ */
 const DIAG_COLS = ["BCP ID","BCP Date","BCP Time","% of total site down in region","Total Sites Down","Total Sites With Power Alarm","Region","Total Sites","Remark"];
 const SEG_COLS = ["Key","First Occurred(NT)","Last Occurred(NT)","Alarm","Alarm Identifier","Site Id","Old Site Id","BTS Name","System","Tech","IP OAM","VLAN OAM","IP S1-CU H3I","VLAN S1-CU H3I","IP  S1-C ISAT","VLAN S1-C ISAT","IP S1-U ISAT","VLAN S1-U ISAT","IP 2G","VLAN 2G","IP Sync","VLAN Sync","MAC Address","Hostname/Router EN","Hostname/Router CN","Hostname/Router AN","Hostname/Router","Hostname Status","Owner","Ring ID","Destination Site","Hub Type","City","Dependency Number","Dependency Site List","DWDM Site","DWDM Status","DWDM Alarm","DWDM Alarm Time","Site Class(Priority)","Genset","Battery Status","MC","Area","Province","Region","VIP","Impact Category","TT","WO","Power Alarm Name","Power Alarm Time","Mains Failure (Exal & PMS) Last Occur Time","Router Power Alarm","Router Power Alarm Time","DWDM Power Alarm Time","DWDM Power Alarm","Transport Outage","Actual Battery Backup Duration/(Minute)","Remark"];
 
-/* ============== ALIAS KOLOM TEMPLATE → NAMA DI FILE SUMBER ============== */
+/* PETA KOLOM OUTPUT ← KOLOM DI SITE DOWN LIST (strict, tanpa fallback) */
+const SDL_SOURCE_MAP = {
+  'Key':                'Key',
+  'Site Id':            'Site Id',
+  'First Occurred(NT)': 'Last Occurred(NT)',  // cross-map
+  'Alarm':              'Alarm',
+  'BTS Name':           'BTS Name',
+  'Hub Type':           'Hub Type',
+  'Power Alarm Name':   'Power Alarm Name',
+  'Power Alarm Time':   'Power Alarm Time',
+};
+
 const COL_ALIASES = {
   'First Occurred(NT)': ['First Occurrence', 'First Occurred', 'FirstOccurred', 'First Occurred (NT)'],
   'Last Occurred(NT)':  ['Last Occurrence',  'Last Occurred',  'LastOccurred',  'Last Occurred (NT)'],
   'Site Id':            ['Site ID', 'SiteID', 'Site Id ', 'Site_Id', 'SITEID'],
+  'Power Alarm Name':   ['Power Alarm Name', 'PowerAlarmName', 'Power Alarm'],
+  'Power Alarm Time':   ['Power Alarm Time', 'PowerAlarmTime'],
 };
 
+/* ============================================================
+   STATE
+============================================================ */
 let potFile = null, segFile = null;
 let lastOutputBlob = null, lastDiagRows = null, lastSegRows = null;
+let processing = false;
+const logLines = [];
+let mappingRows = [];
 
-/* ============== UTIL ============== */
+/* ============================================================
+   UTIL
+============================================================ */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const norm = s => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+function log(msg) {
+  const ts = new Date().toLocaleTimeString('id-ID');
+  logLines.push(`[${ts}] ${msg}`);
+  const el = document.getElementById('debug-content');
+  if (el) el.textContent = logLines.join('\n');
+}
 
 function toast(msg, type = 'success') {
   const el = document.getElementById('toast');
@@ -201,7 +310,50 @@ function toast(msg, type = 'success') {
   el._t = setTimeout(() => el.classList.remove('show'), 4500);
 }
 
-function fmtBytes(b) { return b < 1024 ? b + ' B' : b < 1048576 ? (b/1024).toFixed(1) + ' KB' : (b/1048576).toFixed(2) + ' MB'; }
+function fmtBytes(b) {
+  return b < 1024 ? b + ' B'
+    : b < 1048576 ? (b/1024).toFixed(1) + ' KB'
+    : (b/1048576).toFixed(2) + ' MB';
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+function displayCell(v) {
+  if (v == null) return '';
+  if (v instanceof Date) {
+    const y = v.getFullYear();
+    const m = String(v.getMonth()+1).padStart(2,'0');
+    const d = String(v.getDate()).padStart(2,'0');
+    const hh = String(v.getHours()).padStart(2,'0');
+    const mm = String(v.getMinutes()).padStart(2,'0');
+    const ss = String(v.getSeconds()).padStart(2,'0');
+    return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+  }
+  return String(v);
+}
+
+function parseDate(v) {
+  if (!v) return null;
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  const s = String(v).trim();
+  if (!s) return null;
+  let d = new Date(s);
+  if (!isNaN(d.getTime())) return d;
+  const m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+  if (m) {
+    const a = parseInt(m[1]), b = parseInt(m[2]);
+    let y = parseInt(m[3]);
+    if (y < 100) y += 2000;
+    if (a > 12) return new Date(y, b-1, a);
+    if (b > 12) return new Date(y, a-1, b);
+    return new Date(y, a-1, b);
+  }
+  const n = Number(s);
+  if (!isNaN(n) && n > 0 && n < 100000) return new Date(Math.round((n - 25569) * 86400 * 1000));
+  return null;
+}
 
 function findSheet(wb, patterns) {
   for (const p of patterns) for (const n of wb.SheetNames) if (norm(n) === norm(p)) return n;
@@ -212,7 +364,13 @@ function findSheet(wb, patterns) {
 function sheetToAOA(wb, sheetName) {
   const s = wb.Sheets[sheetName];
   if (!s) return null;
-  return XLSX.utils.sheet_to_json(s, { header: 1, defval: '', raw: false });
+  return XLSX.utils.sheet_to_json(s, { header: 1, defval: '', raw: false, blankrows: true });
+}
+
+function padRow(row, len) {
+  const r = Array.isArray(row) ? row.slice() : [];
+  while (r.length < len) r.push('');
+  return r;
 }
 
 function autoMatch(targetCol, headers) {
@@ -243,6 +401,25 @@ function autoMatch(targetCol, headers) {
   return null;
 }
 
+function exactKeyMatch(headers) {
+  if (!headers) return null;
+  return headers.find(h => norm(h) === 'key') || null;
+}
+
+function findHeaderRowByColumns(rows, requiredTests, scan = 20) {
+  if (!rows) return -1;
+  for (let i = 0; i < Math.min(scan, rows.length); i++) {
+    const r = rows[i];
+    if (!r || !r.length) continue;
+    let allFound = true;
+    for (const test of requiredTests) {
+      if (!r.some(h => test(h))) { allFound = false; break; }
+    }
+    if (allFound) return i;
+  }
+  return -1;
+}
+
 function findHeaderRow(rows, targetHeaders, scan = 25) {
   let bestRow = -1, bestScore = 0;
   for (let i = 0; i < Math.min(rows.length, scan); i++) {
@@ -254,7 +431,34 @@ function findHeaderRow(rows, targetHeaders, scan = 25) {
   return bestScore >= 2 ? bestRow : -1;
 }
 
-/* ============== UPLOAD ============== */
+/* ============================================================
+   SHEETJS FALLBACK LOADER
+============================================================ */
+function ensureSheetJS() {
+  return new Promise((resolve) => {
+    if (window.XLSX) { resolve(true); return; }
+    const cdns = [
+      'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+    ];
+    let i = 0;
+    function tryNext() {
+      if (i >= cdns.length) { resolve(false); return; }
+      const url = cdns[i++];
+      log('Fallback load SheetJS dari: ' + url);
+      const s = document.createElement('script');
+      s.src = url;
+      s.onload = () => window.XLSX ? resolve(true) : tryNext();
+      s.onerror = () => tryNext();
+      document.head.appendChild(s);
+    }
+    setTimeout(() => window.XLSX ? resolve(true) : tryNext(), 600);
+  });
+}
+
+/* ============================================================
+   UPLOAD
+============================================================ */
 function bindDrop(zoneId, inputId, key) {
   const zone = document.getElementById(zoneId);
   const input = document.getElementById(inputId);
@@ -275,7 +479,8 @@ function setFile(key, file) {
   if (key === 'pot') potFile = file; else segFile = file;
   document.getElementById('info-' + key).classList.add('show');
   document.getElementById('name-' + key).textContent = file.name;
-  document.getElementById('meta-' + key).textContent = fmtBytes(file.size) + ' · ' + new Date().toLocaleTimeString();
+  document.getElementById('meta-' + key).textContent = fmtBytes(file.size) + ' · ' + new Date().toLocaleTimeString('id-ID');
+  log(`File ${key.toUpperCase()} dipilih: ${file.name} (${fmtBytes(file.size)})`);
   checkReady();
 }
 
@@ -283,15 +488,19 @@ function clearFile(key) {
   if (key === 'pot') { potFile = null; document.getElementById('file-pot').value = ''; }
   else { segFile = null; document.getElementById('file-seg').value = ''; }
   document.getElementById('info-' + key).classList.remove('show');
+  log(`File ${key.toUpperCase()} di-clear`);
   checkReady();
 }
 
 function checkReady() {
-  document.getElementById('btn-process').disabled = !(potFile && segFile);
+  document.getElementById('btn-process').disabled = !(potFile && segFile) || processing;
 }
 
-/* ============== PROGRESS ============== */
+/* ============================================================
+   PROGRESS
+============================================================ */
 const stageIds = ['stage-pot','stage-seg','stage-match','stage-build','stage-summary','stage-excel'];
+
 function resetStages() {
   stageIds.forEach((id, i) => {
     const el = document.getElementById(id);
@@ -301,6 +510,7 @@ function resetStages() {
   });
   document.getElementById('progress-fill').style.width = '0%';
 }
+
 function startStage(id, text) {
   const el = document.getElementById(id);
   el.className = 'stage active';
@@ -309,6 +519,7 @@ function startStage(id, text) {
   const idx = stageIds.indexOf(id);
   document.getElementById('progress-fill').style.width = ((idx + 0.5) / stageIds.length * 100) + '%';
 }
+
 function doneStage(id, detail) {
   const el = document.getElementById(id);
   el.className = 'stage done';
@@ -317,6 +528,7 @@ function doneStage(id, detail) {
   const idx = stageIds.indexOf(id);
   document.getElementById('progress-fill').style.width = ((idx + 1) / stageIds.length * 100) + '%';
 }
+
 function failStage(id, msg) {
   const el = document.getElementById(id);
   el.className = 'stage error';
@@ -324,106 +536,313 @@ function failStage(id, msg) {
   document.getElementById('det-' + id.replace('stage-','')).textContent = msg;
 }
 
-/* ============== MAIN PROCESS ============== */
+/* ============================================================
+   MAIN PROCESS
+============================================================ */
 async function process() {
-  if (!potFile || !segFile) return;
+  if (processing || !potFile || !segFile) return;
+  processing = true;
+  logLines.length = 0;
+  log('=== Mulai proses kompilasi ===');
+
+  const btn = document.getElementById('btn-process');
+  btn.textContent = '⏳ Memproses...';
+  btn.disabled = true;
+
   document.getElementById('result-card').classList.remove('show');
   document.getElementById('progress-card').classList.add('show');
   resetStages();
-  document.getElementById('btn-process').disabled = true;
 
   try {
+    const ok = await ensureSheetJS();
+    if (!ok) {
+      document.getElementById('cdn-warn').classList.add('show');
+      throw new Error('SheetJS gagal dimuat dari semua CDN. Periksa koneksi internet.');
+    }
+    log('SheetJS siap. Versi: ' + (window.XLSX.version || 'unknown'));
+
     /* ---- 1. Read POT ---- */
     startStage('stage-pot');
     await sleep(350);
+    log('Membaca file POT: ' + potFile.name);
     const potBuf = await potFile.arrayBuffer();
     const potWb = XLSX.read(potBuf, { type: 'array', cellDates: true });
+    log('Sheet di POT: ' + potWb.SheetNames.join(', '));
+
     const summarySheetName = findSheet(potWb, ['Summary Report', 'Summary']);
     if (!summarySheetName) throw new Error('Sheet "Summary Report" tidak ditemukan di file POT');
     const summaryRows = sheetToAOA(potWb, summarySheetName);
+    log('Summary Report: ' + summaryRows.length + ' baris');
+
     doneStage('stage-pot', summaryRows.length + ' baris · sheet "' + summarySheetName + '"');
     await sleep(250);
 
     /* ---- 2. Read Segmentation ---- */
     startStage('stage-seg');
     await sleep(350);
+    log('Membaca file Segmentation: ' + segFile.name);
     const segBuf = await segFile.arrayBuffer();
     const segWb = XLSX.read(segBuf, { type: 'array', cellDates: true });
+    log('Sheet di Segmentation: ' + segWb.SheetNames.join(', '));
+
     const segSheetName = findSheet(segWb, ['segmentation', 'segment info', 'segment_info', 'site']) || segWb.SheetNames[0];
-    const segRows = sheetToAOA(segWb, segSheetName);
-    doneStage('stage-seg', segRows.length + ' baris · sheet "' + segSheetName + '"');
+    const segRowsRaw = sheetToAOA(segWb, segSheetName);
+    log('Segmentation sheet "' + segSheetName + '": ' + segRowsRaw.length + ' baris');
+
+    doneStage('stage-seg', segRowsRaw.length + ' baris · sheet "' + segSheetName + '"');
     await sleep(250);
 
-    /* ---- 3. Match columns ---- */
+    /* ---- 3. Base = Site Down List + Build Lookup ---- */
     startStage('stage-match');
     await sleep(300);
+
+    // 3a. Cari sheet "Site Down List"
+    let siteDownListName = null, siteDownListRows = null;
+    for (const n of potWb.SheetNames) {
+      if (norm(n).includes('sitedown')) { siteDownListName = n; siteDownListRows = sheetToAOA(potWb, n); break; }
+    }
+    if (!siteDownListRows) {
+      for (const n of potWb.SheetNames) {
+        if (norm(n).includes('downlist') || norm(n).includes('downsites')) {
+          siteDownListName = n; siteDownListRows = sheetToAOA(potWb, n); break;
+        }
+      }
+    }
+    if (!siteDownListRows || siteDownListRows.length < 2) {
+      throw new Error('Sheet "Site Down List" tidak ditemukan / kosong di POT Analysis Report');
+    }
+    log('Site Down List: sheet "' + siteDownListName + '" · ' + siteDownListRows.length + ' baris total');
+
+    // 3b. Deteksi header Site Down List
+    let sdlHeaderIdx = findHeaderRowByColumns(siteDownListRows, [
+      h => norm(h) === 'key',
+      h => norm(h).includes('site') && norm(h).includes('id')
+    ], 20);
+    if (sdlHeaderIdx < 0) sdlHeaderIdx = 0;
+    log('Header Site Down List di row index: ' + sdlHeaderIdx);
+
+    const sdlHeader = siteDownListRows[sdlHeaderIdx];
+    const sdlKeyCol = exactKeyMatch(sdlHeader);
+    const sdlSiteCol = autoMatch('Site Id', sdlHeader) || sdlHeader.find(h => norm(h).includes('siteid'));
+    if (!sdlKeyCol) throw new Error('Kolom "Key" tidak ditemukan di sheet "' + siteDownListName + '"');
+    if (!sdlSiteCol) throw new Error('Kolom "Site Id" tidak ditemukan di sheet "' + siteDownListName + '"');
+    log('Kolom Key = "' + sdlKeyCol + '", Site Id = "' + sdlSiteCol + '"');
+
+    const sdlKeyIdx = sdlHeader.indexOf(sdlKeyCol);
+    const sdlSiteIdx = sdlHeader.indexOf(sdlSiteCol);
+    const headerLen = sdlHeader.length;
+
+    // 3b2. Resolve SDL_SOURCE_MAP
+    const sdlMap = {}, sdlMapLabels = {};
+    for (const [tplCol, sdlTarget] of Object.entries(SDL_SOURCE_MAP)) {
+      let found;
+      if (norm(tplCol) === 'key' || norm(sdlTarget) === 'key') {
+        found = exactKeyMatch(sdlHeader);
+      } else {
+        found = autoMatch(sdlTarget, sdlHeader);
+      }
+      if (found) {
+        sdlMap[tplCol] = sdlHeader.indexOf(found);
+        sdlMapLabels[tplCol] = found;
+        log('  SDL map: "' + tplCol + '" ← "' + found + '"');
+      } else {
+        log('  SDL map: "' + tplCol + '" ← TIDAK DITEMUKAN');
+      }
+    }
+
+    // 3c. Pad + simpan semua baris (hanya buang 100% kosong)
+    const rawDataRows = siteDownListRows.slice(sdlHeaderIdx + 1);
+    const paddedRows = rawDataRows.map(r => padRow(r, headerLen));
+    const sdlData = paddedRows.filter(r => r.some(c => c !== '' && c != null));
+    const inputRowCount = rawDataRows.length;
+    const droppedEmpty = inputRowCount - sdlData.length;
+    log('Baris data Site Down List: ' + inputRowCount + ' (kosong dibuang: ' + droppedEmpty + ')');
+
+    // Forward-fill Key (merged cell)
+    let lastKey = '';
+    let mergedKeyFilled = 0;
+    for (const r of sdlData) {
+      const k = r[sdlKeyIdx];
+      const s = r[sdlSiteIdx];
+      const hasKey = (k !== '' && k != null);
+      const hasSite = (s !== '' && s != null);
+      if (!hasKey && hasSite && lastKey !== '') {
+        r[sdlKeyIdx] = lastKey;
+        mergedKeyFilled++;
+      } else if (hasKey) {
+        lastKey = k;
+      }
+    }
+    if (mergedKeyFilled > 0) log('Forward-fill Key: ' + mergedKeyFilled + ' baris (merged cell)');
+
+    // 3c2. Deteksi duplikat (INFO SAJA - tidak di-remove)
+    const sigCount = {};
+    for (const r of sdlData) {
+      const k = String(r[sdlKeyIdx] ?? '').trim();
+      const s = String(r[sdlSiteIdx] ?? '').trim();
+      const sig = k + '||' + s;
+      sigCount[sig] = (sigCount[sig] || 0) + 1;
+    }
+    let dupGroups = 0, dupExtra = 0, dupRowsTotal = 0;
+    for (const c of Object.values(sigCount)) {
+      if (c > 1) { dupGroups++; dupExtra += (c - 1); dupRowsTotal += c; }
+    }
+    log('Duplikat (info): ' + dupGroups + ' grup · ' + dupRowsTotal + ' baris · ' + dupExtra + ' baris ekstra — SEMUA dipertahankan');
+
+    // 3d. Detail POT (untuk alarm sisa)
     let potDetailName = null, potDetailRows = null;
     for (const n of potWb.SheetNames) {
-      if (n === summarySheetName) continue;
+      if (n === summarySheetName || n === siteDownListName) continue;
       const rows = sheetToAOA(potWb, n);
       if (!rows || rows.length < 2) continue;
       if (rows[0].some(h => norm(h).includes('siteid') || norm(h).includes('site'))) {
         potDetailName = n; potDetailRows = rows; break;
       }
     }
-    const segHeader = segRows[0] || [];
-    const segData = segRows.slice(1).filter(r => r.some(c => c !== '' && c != null));
+    log('POT detail: ' + (potDetailName ? 'sheet "' + potDetailName + '"' : 'TIDAK ADA'));
+
+    // 3e. Data Segmentation & POT detail
+    const segHeaderIdx = findHeaderRowByColumns(segRowsRaw, [
+      h => norm(h).includes('site') && norm(h).includes('id')
+    ], 15);
+    const segHeaderRowIdx = segHeaderIdx >= 0 ? segHeaderIdx : 0;
+    const segHeader = segRowsRaw[segHeaderRowIdx] || [];
+    const segData = segRowsRaw.slice(segHeaderRowIdx + 1).filter(r => r.some(c => c !== '' && c != null));
     const potHeader = potDetailRows ? potDetailRows[0] : [];
     const potData = potDetailRows ? potDetailRows.slice(1).filter(r => r.some(c => c !== '' && c != null)) : [];
 
-    const segMap = {}, potMap = {};
-    for (const tc of SEG_COLS) {
-      const fromSeg = autoMatch(tc, segHeader);
-      const fromPot = autoMatch(tc, potHeader);
-      const isAlarm = /first|last|occurred|alarm|tt|wo/i.test(tc);
-      if (isAlarm && fromPot) potMap[tc] = fromPot;
-      else if (fromSeg) segMap[tc] = fromSeg;
-      else if (fromPot) potMap[tc] = fromPot;
-    }
-    const totalMatched = Object.keys(segMap).length + Object.keys(potMap).length;
-    doneStage('stage-match', totalMatched + '/' + SEG_COLS.length + ' kolom · detail="' + (potDetailName || 'N/A') + '"');
-    await sleep(250);
-
-    /* ---- 4. Build segmentation sheet ---- */
-    startStage('stage-build');
-    await sleep(350);
-    const potSiteCol = autoMatch('Site Id', potHeader) || potHeader.find(h => norm(h).includes('siteid'));
+    // 3f. Lookup segLookup (first-match)
     const segSiteCol = autoMatch('Site Id', segHeader) || segHeader.find(h => norm(h).includes('siteid'));
+    const segLookup = {};
+    if (segSiteCol) {
+      const idx = segHeader.indexOf(segSiteCol);
+      for (const r of segData) {
+        const sid = String(r[idx] ?? '').trim();
+        if (!sid) continue;
+        if (!(sid in segLookup)) segLookup[sid] = r;
+      }
+      log('Seg lookup: ' + Object.keys(segLookup).length + ' site unik');
+    }
 
+    // 3g. Lookup potLookup (semua baris per site)
+    const potSiteCol = autoMatch('Site Id', potHeader) || potHeader.find(h => norm(h).includes('siteid'));
     const potLookup = {};
-    if (potData.length && potSiteCol) {
+    if (potSiteCol) {
       const idx = potHeader.indexOf(potSiteCol);
       for (const r of potData) {
         const sid = String(r[idx] ?? '').trim();
         if (!sid) continue;
         (potLookup[sid] = potLookup[sid] || []).push(r);
       }
+      log('POT detail lookup: ' + Object.keys(potLookup).length + ' site unik');
     }
 
-    const segOutRows = [SEG_COLS.slice()];
-    for (let i = 0; i < segData.length; i++) {
-      const srow = segData[i];
-      let potMatches = [];
-      if (segSiteCol) {
-        const sid = String(srow[segHeader.indexOf(segSiteCol)] ?? '').trim();
-        potMatches = potLookup[sid] || [];
+    // 3h. Build mapping
+    const segMap = {}, potMap = {};
+    mappingRows = [];
+    for (const tc of SEG_COLS) {
+      if (SDL_SOURCE_MAP[tc] !== undefined) {
+        if (sdlMap[tc] !== undefined) {
+          const isCross = tc === 'First Occurred(NT)';
+          mappingRows.push({
+            template: tc,
+            source: isCross ? 'POT Site Down List (cross-map)' : 'POT Site Down List',
+            matched: sdlMapLabels[tc],
+            ok: true,
+            cls: isCross ? 'tr-cross' : 'tr-sdl'
+          });
+        } else {
+          mappingRows.push({ template: tc, source: 'POT Site Down List (not found)', matched: '—', ok: false, cls: '' });
+        }
+        continue;
       }
+      const fromSeg = autoMatch(tc, segHeader);
+      const fromPot = autoMatch(tc, potHeader);
+      const isAlarm = /first|last|occurred|alarm|tt|wo/i.test(tc);
+      if (isAlarm && fromPot) {
+        potMap[tc] = fromPot;
+        mappingRows.push({ template: tc, source: 'POT Detail', matched: fromPot, ok: true, cls: 'tr-pot' });
+      } else if (fromSeg) {
+        segMap[tc] = fromSeg;
+        mappingRows.push({ template: tc, source: 'Segmentation Info', matched: fromSeg, ok: true, cls: 'tr-seg' });
+      } else if (fromPot) {
+        potMap[tc] = fromPot;
+        mappingRows.push({ template: tc, source: 'POT Detail', matched: fromPot, ok: true, cls: 'tr-pot' });
+      } else {
+        mappingRows.push({ template: tc, source: '—', matched: '—', ok: false, cls: '' });
+      }
+    }
+    const totalMatched = mappingRows.filter(m => m.ok).length;
+    log('Kolom ter-match: ' + totalMatched + '/' + SEG_COLS.length);
+
+    let matchDetail = sdlData.length + ' baris base';
+    if (dupGroups > 0) matchDetail += ' (' + dupRowsTotal + ' duplikat)';
+    if (mergedKeyFilled > 0) matchDetail += ' +' + mergedKeyFilled + ' merged';
+    matchDetail += ' · ' + totalMatched + '/' + SEG_COLS.length + ' kolom';
+    doneStage('stage-match', matchDetail);
+    await sleep(250);
+
+    /* ---- 4. Build segmentation sheet (1:1 SEMUA baris) ---- */
+    startStage('stage-build');
+    await sleep(350);
+
+    const segOutRows = [SEG_COLS.slice()];
+    let segHitCount = 0, potHitCount = 0, keyFilledCount = 0;
+
+    for (let i = 0; i < sdlData.length; i++) {
+      // Yield ke UI setiap 500 baris (progress)
+      if (i > 0 && i % 500 === 0) {
+        document.getElementById('det-build').textContent = `Memproses ${i.toLocaleString('id-ID')}/${sdlData.length.toLocaleString('id-ID')}...`;
+        await sleep(0);
+      }
+
+      const sdlRow = sdlData[i];
+      const sid = String(sdlRow[sdlSiteIdx] ?? '').trim();
+
+      const segRow = sid ? (segLookup[sid] || null) : null;
+      if (segRow) segHitCount++;
+      const potMatches = sid ? (potLookup[sid] || []) : [];
+      if (potMatches.length) potHitCount++;
+
       const out = [];
       for (const tc of SEG_COLS) {
         let val = '';
-        if (tc === 'Key') {
-          val = i + 1;
-        } else if (segMap[tc] !== undefined) {
-          val = srow[segHeader.indexOf(segMap[tc])] ?? '';
-        } else if (potMap[tc] !== undefined && potMatches.length) {
+
+        // Priority 1: SDL_SOURCE_MAP (STRICT, no fallback)
+        if (SDL_SOURCE_MAP[tc] !== undefined) {
+          if (sdlMap[tc] !== undefined) {
+            if (tc === 'Key') {
+              val = sdlRow[sdlMap[tc]] ?? '';
+              if (val !== '' && val != null) keyFilledCount++;
+            } else if (tc === 'Site Id') {
+              val = sid;
+            } else {
+              val = sdlRow[sdlMap[tc]] ?? '';
+            }
+          }
+        }
+        // Priority 2: Segmentation Info
+        else if (segMap[tc] !== undefined && segRow) {
+          val = segRow[segHeader.indexOf(segMap[tc])] ?? '';
+        }
+        // Priority 3: POT detail dengan agregasi
+        else if (potMap[tc] !== undefined && potMatches.length) {
           const pi = potHeader.indexOf(potMap[tc]);
           if (/first.*occurred/i.test(tc)) {
-            let best = null;
-            for (const m of potMatches) { const v = m[pi]; if (v && (!best || new Date(v) < new Date(best))) best = v; }
+            let best = null, bestDate = null;
+            for (const m of potMatches) {
+              const v = m[pi]; const d = parseDate(v);
+              if (!v) continue;
+              if (!bestDate || (d && d < bestDate)) { best = v; bestDate = d; }
+            }
             val = best ?? potMatches[0][pi] ?? '';
           } else if (/last.*occurred/i.test(tc)) {
-            let best = null;
-            for (const m of potMatches) { const v = m[pi]; if (v && (!best || new Date(v) > new Date(best))) best = v; }
+            let best = null, bestDate = null;
+            for (const m of potMatches) {
+              const v = m[pi]; const d = parseDate(v);
+              if (!v) continue;
+              if (!bestDate || (d && d > bestDate)) { best = v; bestDate = d; }
+            }
             val = best ?? potMatches[0][pi] ?? '';
           } else {
             val = potMatches[0][pi] ?? '';
@@ -433,7 +852,16 @@ async function process() {
       }
       segOutRows.push(out);
     }
-    doneStage('stage-build', (segOutRows.length - 1) + ' baris');
+
+    const outputRowCount = segOutRows.length - 1;
+    const enrichRate = sdlData.length ? Math.round((segHitCount / sdlData.length) * 100) : 0;
+
+    let buildDetail = outputRowCount + ' baris output';
+    if (dupGroups > 0) buildDetail += ' (termasuk ' + dupRowsTotal + ' duplikat)';
+    buildDetail += ' · Key: ' + keyFilledCount;
+    buildDetail += ' · Seg: ' + segHitCount + '/' + sdlData.length;
+    doneStage('stage-build', buildDetail);
+    log('Output bcp_segmentation: ' + outputRowCount + ' baris · Key: ' + keyFilledCount + ' · Seg match: ' + segHitCount + ' · POT: ' + potHitCount);
     await sleep(250);
 
     /* ---- 5. Summary Report → bcp_diagram ---- */
@@ -454,6 +882,7 @@ async function process() {
         }
         diagOutRows.push(out);
       }
+      log('bcp_diagram: ' + (diagOutRows.length - 1) + ' baris');
     }
     doneStage('stage-summary', (diagOutRows.length - 1) + ' baris');
     await sleep(250);
@@ -469,27 +898,108 @@ async function process() {
     lastDiagRows = diagOutRows;
     lastSegRows = segOutRows;
     doneStage('stage-excel', fmtBytes(lastOutputBlob.size));
+    log('Excel output: ' + fmtBytes(lastOutputBlob.size));
 
-    document.getElementById('stat-diag').textContent = (diagOutRows.length - 1).toLocaleString();
-    document.getElementById('stat-seg').textContent = (segOutRows.length - 1).toLocaleString();
-    document.getElementById('stat-matched').textContent = totalMatched + '/' + SEG_COLS.length;
+    /* ---- Result ---- */
+    document.getElementById('stat-diag').textContent = (diagOutRows.length - 1).toLocaleString('id-ID');
+    document.getElementById('stat-base').textContent = sdlData.length.toLocaleString('id-ID');
+    document.getElementById('stat-output').textContent = outputRowCount.toLocaleString('id-ID');
+    document.getElementById('stat-dup').textContent = dupRowsTotal.toLocaleString('id-ID');
+
+    const isIntegrityOk = (outputRowCount === sdlData.length);
+    const baseCard = document.getElementById('stat-base-card');
+    const outputCard = document.getElementById('stat-output-card');
+    baseCard.className = 'stat' + (isIntegrityOk ? ' integrity-ok' : ' integrity-warn');
+    outputCard.className = 'stat' + (isIntegrityOk ? ' integrity-ok' : ' integrity-warn');
+
+    const integrityNote = document.getElementById('integrity-note');
+    if (isIntegrityOk) {
+      integrityNote.className = 'integrity-note ok';
+      integrityNote.innerHTML =
+        '✅ <b>1:1 Verifikasi OK:</b> ' + inputRowCount.toLocaleString('id-ID') + ' baris SDL (raw) → ' +
+        (droppedEmpty > 0 ? droppedEmpty + ' baris kosong diabaikan → ' : '') +
+        sdlData.length.toLocaleString('id-ID') + ' baris diproses → ' +
+        outputRowCount.toLocaleString('id-ID') + ' baris output. <b>Tidak ada baris hilang.</b>' +
+        (mergedKeyFilled > 0 ? ' · ' + mergedKeyFilled + ' Key di-forward-fill (merged cell).' : '');
+    } else {
+      integrityNote.className = 'integrity-note warn';
+      integrityNote.innerHTML =
+        '⚠️ <b>Perhatian:</b> ' + sdlData.length + ' baris diproses vs ' + outputRowCount + ' output. ' +
+        'Selisih ' + Math.abs(sdlData.length - outputRowCount) + '.';
+    }
+
+    const dupNote = document.getElementById('dup-note');
+    if (dupRowsTotal > 0) {
+      dupNote.innerHTML =
+        '🔁 <b>Duplikat dipertahankan:</b> ' + dupGroups + ' grup signature (Key+Site Id) muncul &gt;1× · ' +
+        dupRowsTotal + ' baris total · ' + dupExtra + ' baris ekstra.<br>' +
+        '<small>✅ Sesuai permintaan: <b>tidak ada dedupe</b> — semua baris duplikat tetap masuk ke output.</small>';
+    } else {
+      dupNote.innerHTML = '🔁 <b>Duplikat:</b> tidak ada duplikat terdeteksi (semua baris unik).';
+    }
+
+    document.getElementById('flow-note').innerHTML =
+      '🧭 <b>Alur:</b> ' + sdlData.length + ' baris dari <code>' + escapeHtml(siteDownListName) + '</code> → ' +
+      segHitCount + ' site diperkaya dari Segmentation (' + enrichRate + '%) · ' +
+      potHitCount + ' site punya detail POT.';
+
+    let keyNoteHtml = '🔑 <b>Key:</b> kolom <code>' + escapeHtml(sdlKeyCol) + '</code> dari <code>' + escapeHtml(siteDownListName) + '</code> · ' +
+      keyFilledCount + '/' + sdlData.length + ' baris terisi';
+    if (mergedKeyFilled > 0) keyNoteHtml += ' (+' + mergedKeyFilled + ' merged)';
+    keyNoteHtml += '.';
+    document.getElementById('key-note').innerHTML = keyNoteHtml;
+
+    renderMappingTable();
     renderPreview('prev-diag', diagOutRows, 15);
     renderPreview('prev-seg', segOutRows, 15);
+
     document.getElementById('result-card').classList.add('show');
     document.getElementById('result-card').scrollIntoView({ behavior: 'smooth' });
-    toast('✅ Kompilasi berhasil!', 'success');
-    document.getElementById('btn-process').disabled = false;
+
+    if (isIntegrityOk) {
+      toast('✅ Berhasil! ' + outputRowCount + ' baris = ' + sdlData.length + ' base (termasuk ' + dupRowsTotal + ' duplikat).', 'success');
+    } else {
+      toast('⚠️ Selesai, ada selisih baris. Cek integrity note.', 'warn');
+    }
+    log('=== Proses selesai ===');
 
   } catch (err) {
     console.error(err);
+    log('❌ ERROR: ' + err.message);
+    if (err.stack) log('Stack: ' + err.stack.split('\n').slice(0,5).join('\n'));
     const active = document.querySelector('.stage.active');
     if (active) failStage(active.id, err.message);
     toast('❌ ' + err.message, 'error');
-    document.getElementById('btn-process').disabled = false;
+  } finally {
+    btn.textContent = '🚀 Proses Kompilasi';
+    processing = false;
+    checkReady();
   }
 }
 
-/* ============== PREVIEW + DOWNLOAD ============== */
+/* ============================================================
+   MAPPING TABLE
+============================================================ */
+function renderMappingTable() {
+  const tbody = document.getElementById('mapping-body');
+  if (!tbody) return;
+  let html = '';
+  for (const m of mappingRows) {
+    const statusCls = m.ok ? 'matched' : 'unmatched';
+    const statusTxt = m.ok ? '✓' : '✕';
+    html += `<tr class="${m.cls}">`;
+    html += `<td>${escapeHtml(m.template)}</td>`;
+    html += `<td class="source">${escapeHtml(m.matched)}</td>`;
+    html += `<td>${escapeHtml(m.source)}</td>`;
+    html += `<td class="${statusCls}">${statusTxt}</td>`;
+    html += '</tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+/* ============================================================
+   PREVIEW + DOWNLOAD
+============================================================ */
 function renderPreview(elId, rows, limit) {
   const el = document.getElementById(elId);
   const data = rows.slice(0, limit + 1);
@@ -498,7 +1008,7 @@ function renderPreview(elId, rows, limit) {
   html += '</tr></thead><tbody>';
   for (let i = 1; i < data.length; i++) {
     html += '<tr>';
-    for (const c of data[i]) html += '<td>' + escapeHtml(c) + '</td>';
+    for (const c of data[i]) html += '<td>' + escapeHtml(displayCell(c)) + '</td>';
     html += '</tr>';
   }
   html += '</tbody></table>';
@@ -507,7 +1017,6 @@ function renderPreview(elId, rows, limit) {
 }
 
 function togglePreview(id) { document.getElementById(id).classList.toggle('show'); }
-function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 
 function downloadOutput() {
   if (!lastOutputBlob) return;
@@ -521,6 +1030,21 @@ function downloadOutput() {
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 2000);
   toast('📥 File berhasil diunduh', 'success');
+  log('Download: ' + a.download);
+}
+
+function downloadLog() {
+  if (logLines.length === 0) { toast('Log kosong', 'warn'); return; }
+  const content = logLines.join('\n');
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+  a.href = url;
+  a.download = 'bcp_compiler_log_' + ts + '.txt';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  toast('📥 Log berhasil diunduh', 'success');
 }
 
 function resetAll() {
@@ -532,13 +1056,19 @@ function resetAll() {
   document.getElementById('info-seg').classList.remove('show');
   document.getElementById('progress-card').classList.remove('show');
   document.getElementById('result-card').classList.remove('show');
+  document.getElementById('mapping-body').innerHTML = '';
+  logLines.length = 0;
+  log('Reset');
   resetStages();
   checkReady();
 }
 
-/* ============== INIT ============== */
+/* ============================================================
+   INIT
+============================================================ */
 bindDrop('dz-pot', 'file-pot', 'pot');
 bindDrop('dz-seg', 'file-seg', 'seg');
+log('Aplikasi siap. Menunggu upload file...');
 </script>
 </body>
 </html>
