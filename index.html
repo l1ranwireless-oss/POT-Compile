@@ -226,7 +226,7 @@
 <div class="container">
   <div class="header">
     <h1>⚡ BCP COMPILER</h1>
-    <p><b>POT</b> · <b>Segmentation</b> · <b>CMDB</b> · <b>ZIP Power Alarm</b> → 4 Sheets + Summary</p>
+    <p><b>POT</b> · <b>Segmentation</b> · <b>CMDB Site</b> · <b>ZIP Power Alarm</b> → 4 Sheets + Summary</p>
   </div>
 
   <div class="cdn-warn" id="cdn-warn">⚠️ <b>Library Excel gagal dimuat.</b> Periksa koneksi internet.</div>
@@ -267,8 +267,8 @@
     </div>
 
     <div class="upload-card cmdb">
-      <h2>🟡 CMDB <span class="badge yellow">OPSIONAL</span></h2>
-      <div class="desc">Auto chunking · 14 kolom · cache system</div>
+      <h2>🟡 CMDB (Sheet "Site") <span class="badge yellow">OPSIONAL</span></h2>
+      <div class="desc">Auto chunk · header detection · 14 kolom</div>
       <label class="drop-zone" id="dz-cmdb">
         <input type="file" id="file-cmdb" accept=".xlsx,.xls,.csv">
         <div class="icon">📙</div>
@@ -321,9 +321,9 @@
     <div class="progress-bar"><div class="progress-bar-fill" id="progress-fill"></div></div>
     <div class="stages">
       <div class="stage" id="stage-pot"><div class="indicator">1</div><div class="text">Membaca POT</div><div class="detail" id="det-pot"></div></div>
-      <div class="stage" id="stage-seg"><div class="indicator">2</div><div class="text">Membaca Segmentation + CMDB</div><div class="detail" id="det-seg"></div></div>
+      <div class="stage" id="stage-seg"><div class="indicator">2</div><div class="text">Membaca Segmentation + CMDB Site</div><div class="detail" id="det-seg"></div></div>
       <div class="stage" id="stage-zip"><div class="indicator">3</div><div class="text">Membaca ZIP Power Alarm</div><div class="detail" id="det-zip"></div></div>
-      <div class="stage" id="stage-base"><div class="indicator">4</div><div class="text">Chunking CMDB + Base SDL</div><div class="detail" id="det-base"></div></div>
+      <div class="stage" id="stage-base"><div class="indicator">4</div><div class="text">Chunking CMDB Site + Base SDL</div><div class="detail" id="det-base"></div></div>
       <div class="stage" id="stage-build"><div class="indicator">5</div><div class="text">Membangun Segmentation</div><div class="detail" id="det-build"></div></div>
       <div class="stage" id="stage-agg"><div class="indicator">6</div><div class="text">Membangun Diagram + PG + GDOC</div><div class="detail" id="det-agg"></div></div>
       <div class="stage" id="stage-excel"><div class="indicator">7</div><div class="text">Menyusun Excel + Summary</div><div class="detail" id="det-excel"></div></div>
@@ -333,7 +333,7 @@
   <div class="summary-card" id="summary-card">
     <h2><span class="icon-badge">📊</span> INCIDENT SUMMARY</h2>
     <div class="summary-meta">
-      <span>Source: GDOC + PG</span>
+      <span>Source: Summary Report + GDOC + PG + CMDB</span>
       <span id="sum-meta-mc">MC: -</span>
       <span id="sum-meta-down">Down: -</span>
       <span id="sum-meta-alarm">Alarm: -</span>
@@ -409,13 +409,44 @@ const GDOC_COLS = ["MC Area","MC Cluster site down > 25 % (Yes, No)","Site ID","
 const GDOC_HEADER_COLORS = [...Array(9).fill('00E676'),...Array(5).fill('5BC0DE'),...Array(6).fill('FFC000')];
 const GDOC_IDX = {MC_AREA:0,MC_25:1,SITE_ID:2,SITE_NAME:3,STATUS:4,HUB_TYPE:5,TRANSPORT:6,GENSET:7,SITE_CLASS:8,SUPER_SITES:9,TRAFFIC:10,P0:11,VVIP:12,VIP:13,GENSET_DEPLOY:14,ADDITIONAL_MC:15,FME:16,RTS:17,CA:18,UPDATE_TEAM:19};
 const PG_IDX = {TIME:0,REGION:1,MC_NAME:2,TOTAL_MC:3,BIG_DOWN:4,MEDIUM_DOWN:5,SMALL_DOWN:6,CRITICAL_DOWN:7,END_DOWN:8,TOTAL_DOWN:9,PCT_DOWN:10};
-const SDL_SOURCE_MAP = {'Key':'Key','Site Id':'Site Id','First Occurred(NT)':'Last Occurred(NT)','Last Occurred(NT)':'Last Occurred(NT)','Alarm':'Alarm','Alarm Identifier':'Alarm Identifier','BTS Name':'Site Name','Hub Type':'Hub Type','City':'City','MC':'MC','Area':'Area','Province':'Province','VIP':'VIP','Impact Category':'Impact Category','TT':'TT','WO':'WO','Power Alarm Name':'Power Alarm Name','Power Alarm Time':'Power Alarm Time','Mains Failure (Exal & PMS) Last Occur Time':'Mains Failure (Exal & PMS) Last Occur Time','Router Power Alarm':'Router Power Alarm','Router Power Alarm Time':'Router Power Alarm Time','Transport Outage':'Transport Outage','Actual Battery Backup Duration/(Minute)':'Actual Battery Backup Duration/(Minute)','Remark':'Remark'};
-const COL_ALIASES = {'First Occurred(NT)':['First Occurrence','First Occurred','FirstOccurred'],'Last Occurred(NT)':['Last Occurrence','Last Occurred','LastOccurred'],'Site Id':['Site ID','SiteID','Site_Id','SITEID','Site ID*'],'Site Name':['Site Name','SiteName','Site Name*','BTS Name','BTSName'],'Key':['Key'],'Site Name*':['Site Name*','Site Name','SiteName'],'HUB Type':['HUB Type','Hub Type','HubType'],'Site Priority Label':['Site Priority Label','Site Priority','Site Class'],'Has Generator':['Has Generator','Permanent Genset','Generator'],'DG Status':['DG Status'],'Traffic Class':['Traffic Class','>2TB','2TB'],'P0 Sites':['P0 Sites','P0Sites','P0'],'Is VIP':['Is VIP','VIP','VVIP'],'FM Office*':['FM Office*','FM Office','FME Office'],'Rts Name':['Rts Name','RTS'],'Rts Id':['Rts Id'],'MC Cluster':['MC Cluster','MC Area','MCArea'],'Is Hub':['Is Hub','Super Sites','SuperSites'],'Site Class(Priority)':['Site Class(Priority)','Site Class','Site Priority','Site Priority Label'],'Site Class':['Site Class','Site Class(Priority)','Site Priority','Site Priority Label'],'Super Sites':['Super Sites','SuperSites','Is Hub','IsHub'],'>2TB':['>2TB','>2 TB','2TB','Traffic Class','TrafficClass'],'P0':['P0','P0 Sites','P0Sites'],'VVIP':['VVIP','V.VIP'],'VIP':['VIP','V.I.P','Is VIP'],'Genset':['Genset','Genset Status','Generator Status']};
-const SNAPSHOT_COLORS = [{fill:'DBEAFE',font:'1E40AF'},{fill:'D1FAE5',font:'065F46'},{fill:'FEF3C7',font:'92400E'},{fill:'FFEDD5',font:'9A3412'},{fill:'FEE2E2',font:'991B1B'},{fill:'F3E8FF',font:'6B21A8'},{fill:'FFE4E6',font:'9F1239'},{fill:'CCFBF1',font:'134E4A'}];
+
 const CMDB_NEEDED_COLS = ['Site Id','Site Name*','HUB Type','Site Priority Label','Has Generator','DG Status','Traffic Class','P0 Sites','Is VIP','FM Office*','Rts Name','Rts Id','MC Cluster','Is Hub'];
 const CMDB_NEEDED_IDX = {}; CMDB_NEEDED_COLS.forEach((a,i)=>{CMDB_NEEDED_IDX[a]=i;});
-const FILE_SIZE_WARN_MB = 10;
-const CHUNK_SIZE_CMDB = 5000;
+const CMDB_CRITICAL_COLS = ['Site Id', 'MC Cluster', 'HUB Type', 'Site Priority Label'];
+
+const COL_ALIASES = {
+  'Key': ['Key'],
+  'First Occurred(NT)': ['First Occurrence','First Occurred','FirstOccurred'],
+  'Last Occurred(NT)':  ['Last Occurrence','Last Occurred','LastOccurred'],
+  'Site Id': ['Site ID','SiteID','Site_Id','SITEID','Site ID*','Site Id*','Site','SiteCode','Site Code'],
+  'Site Name': ['Site Name','SiteName','Site Name*','Site_Name','BTS Name','BTSName','Name'],
+  'Site Name*': ['Site Name*','Site Name','SiteName','Site_Name','BTS Name','BTSName','Name'],
+  'MC Cluster': ['MC Cluster','MC Area','MCArea','MC Cluster Name','MCCluster','MC_Cluster','Cluster','Cluster Name','MCClusterName'],
+  'HUB Type': ['HUB Type','Hub Type','HubType','Hub_Type','HubTypeLabel','HUBType','Site Type'],
+  'Site Priority Label': ['Site Priority Label','Site Priority','Site Class','SiteClass','Priority','Priority Label','SitePriorityLabel','Class'],
+  'Site Class(Priority)': ['Site Class(Priority)','Site Class','Site Priority','Site Priority Label','SiteClass','Priority'],
+  'Site Class': ['Site Class','Site Class(Priority)','Site Priority','Site Priority Label','SiteClass','Priority'],
+  'Has Generator': ['Has Generator','Permanent Genset','Generator','Has_Generator','HasDG','Has Genset'],
+  'DG Status': ['DG Status','DGStatus','DG_Status','Genset Status','Generator Status'],
+  'Traffic Class': ['Traffic Class','>2TB','2TB','TrafficClass','Traffic_Class','Traffic'],
+  '>2TB': ['>2TB','>2 TB','2TB','Traffic Class','TrafficClass','Traffic'],
+  'P0 Sites': ['P0 Sites','P0Sites','P0','P0 Site','P0Site','P0_Sites'],
+  'P0': ['P0','P0 Sites','P0Sites','P0 Site','P0Site'],
+  'Is VIP': ['Is VIP','VIP','VVIP','IsVIP','Is_VIP','VIP Type'],
+  'VVIP': ['VVIP','V.VIP','Is VVIP'],
+  'VIP': ['VIP','V.I.P','Is VIP'],
+  'FM Office*': ['FM Office*','FM Office','FME Office','FMOffice','FM_Office','Office','FM','FME'],
+  'Rts Name': ['Rts Name','RTS','RtsName','RTS Name','RTS_Name','Rts'],
+  'Rts Id': ['Rts Id','RtsId','RTS ID','RTS_ID','RTS'],
+  'Is Hub': ['Is Hub','Super Sites','SuperSites','IsHub','Is_Hub','Super Site'],
+  'Super Sites': ['Super Sites','SuperSites','Is Hub','IsHub','Super Site'],
+  'Genset': ['Genset','Genset Status','Generator Status','GensetStatus']
+};
+
+const SNAPSHOT_COLORS = [{fill:'DBEAFE',font:'1E40AF'},{fill:'D1FAE5',font:'065F46'},{fill:'FEF3C7',font:'92400E'},{fill:'FFEDD5',font:'9A3412'},{fill:'FEE2E2',font:'991B1B'},{fill:'F3E8FF',font:'6B21A8'},{fill:'FFE4E6',font:'9F1239'},{fill:'CCFBF1',font:'134E4A'}];
+const SDL_SOURCE_MAP = {'Key':'Key','Site Id':'Site Id','First Occurred(NT)':'Last Occurred(NT)','Last Occurred(NT)':'Last Occurred(NT)','Alarm':'Alarm','Alarm Identifier':'Alarm Identifier','BTS Name':'Site Name','Hub Type':'Hub Type','City':'City','MC':'MC','Area':'Area','Province':'Province','VIP':'VIP','Impact Category':'Impact Category','TT':'TT','WO':'WO','Power Alarm Name':'Power Alarm Name','Power Alarm Time':'Power Alarm Time','Mains Failure (Exal & PMS) Last Occur Time':'Mains Failure (Exal & PMS) Last Occur Time','Router Power Alarm':'Router Power Alarm','Router Power Alarm Time':'Router Power Alarm Time','Transport Outage':'Transport Outage','Actual Battery Backup Duration/(Minute)':'Actual Battery Backup Duration/(Minute)','Remark':'Remark'};
+
+const FILE_SIZE_WARN_MB = 10, CHUNK_SIZE_CMDB = 5000;
 const STATUS_DOWN_COLOR = 'FF0000', STATUS_UP_COLOR = '00B050';
 const FONT_BLACK = '000000', FONT_WHITE = 'FFFFFF';
 
@@ -424,50 +455,38 @@ let lastOutputBlob = null;
 let processing = false;
 const logLines = [];
 
-/* ═══════════════ CMDB CACHE SYSTEM ═══════════════ */
+/* ═══════════════ CMDB CACHE ═══════════════ */
 const CMDB_CACHE = {
-  chunks: [],
-  index: new Map(),
-  statsByMC: new Map(),
-  globalStats: null,
-  meta: { rows:0, cols:0, chunks:0, processed:0, skipped:0, sites:0, mcCount:0, loadedAt:null, loadedAtISO:null, signature:null }
+  chunks: [], index: new Map(), statsByMC: new Map(), globalStats: null,
+  meta: { rows:0, cols:0, chunks:0, processed:0, skipped:0, sites:0, mcCount:0, loadedAt:null, loadedAtISO:null, signature:null, sheetName:null, headerIdx:null, criticalMissing:[] }
 };
-
 function emptyStats(displayName) {
   return { displayName: displayName || '', total:0, big:0, medium:0, small:0, end:0, bigMedDG:0, bigMedNoDG:0, critical:0, criticalDG:0, criticalNoDG:0 };
 }
-
 function incrementStats(stats, hub, cls, hasDG) {
   stats.total++;
-  const hubU = (hub || '').toUpperCase();
-  const clsU = (cls || '').toUpperCase();
-  const isBig = hubU.includes('BIG');
-  const isMed = hubU.includes('MEDIUM');
-  const isSmall = hubU.includes('SMALL');
-  const isEnd = hubU.includes('END');
-  const isCrit = clsU.includes('CRITICAL');
-  const isBigMed = isBig || isMed;
+  const h = (hub || '').toUpperCase(), c = (cls || '').toUpperCase();
+  const isBig = h.includes('BIG'), isMed = h.includes('MEDIUM'), isSmall = h.includes('SMALL'), isEnd = h.includes('END');
+  const isCrit = c.includes('CRITICAL');
   if (isBig) stats.big++;
   if (isMed) stats.medium++;
   if (isSmall) stats.small++;
   if (isEnd) stats.end++;
-  if (isBigMed) { if (hasDG) stats.bigMedDG++; else stats.bigMedNoDG++; }
+  if (isBig || isMed) { if (hasDG) stats.bigMedDG++; else stats.bigMedNoDG++; }
   if (isCrit) { stats.critical++; if (hasDG) stats.criticalDG++; else stats.criticalNoDG++; }
 }
-
 function clearCMDB() {
-  const hadSites = CMDB_CACHE.meta.sites || 0;
+  const had = CMDB_CACHE.meta.sites || 0;
   CMDB_CACHE.chunks.forEach(ch => ch.clear());
   CMDB_CACHE.chunks.length = 0;
   CMDB_CACHE.index.clear();
   CMDB_CACHE.statsByMC.clear();
   CMDB_CACHE.globalStats = emptyStats('ALL');
-  CMDB_CACHE.meta = { rows:0, cols:0, chunks:0, processed:0, skipped:0, sites:0, mcCount:0, loadedAt:null, loadedAtISO:null, signature:null };
-  if (hadSites > 0) log(`🗑️ CMDB cache cleared (was: ${hadSites} sites)`);
+  CMDB_CACHE.meta = { rows:0, cols:0, chunks:0, processed:0, skipped:0, sites:0, mcCount:0, loadedAt:null, loadedAtISO:null, signature:null, sheetName:null, headerIdx:null, criticalMissing:[] };
+  if (had > 0) log(`🗑️ CMDB cache cleared (was: ${had} sites)`);
   updateCMDBBadge();
   try { if (window.gc) window.gc(); } catch (e) {}
 }
-
 function updateCMDBBadge() {
   const badge = document.getElementById('cmdb-cache-badge');
   if (!badge) return;
@@ -476,12 +495,64 @@ function updateCMDBBadge() {
     badge.className = 'cmdb-badge empty';
     badge.innerHTML = '⚪ <b>CMDB Cache:</b> kosong <button class="cache-clear-btn" onclick="clearCMDB()">🗑️ Clear</button>';
   } else {
+    const cr = m.criticalMissing && m.criticalMissing.length ? ` ⚠️ ${m.criticalMissing.length} critical missing` : '';
     badge.className = 'cmdb-badge loaded';
-    badge.innerHTML = `🟢 <b>CMDB Cache:</b> ${m.sites.toLocaleString('id-ID')} sites · ${m.chunks} chunks · ${m.mcCount} MC · ${m.rows.toLocaleString('id-ID')} rows · loaded ${m.loadedAt} <button class="cache-clear-btn" onclick="clearCMDB()">🗑️ Clear</button>`;
+    badge.innerHTML = `🟢 <b>CMDB Site:</b> "${m.sheetName}" · ${m.sites.toLocaleString('id-ID')} sites · ${m.chunks} chunks · ${m.mcCount} MC · header#${m.headerIdx}${cr} <button class="cache-clear-btn" onclick="clearCMDB()">🗑️ Clear</button>`;
   }
 }
 
-async function loadCMDBInChunks(cmdbRowsRaw, cmdbHeader, colIdxMap, siteKeyFn) {
+function findCMDBSheet(wb) {
+  if (!wb || !wb.SheetNames || !wb.SheetNames.length) return null;
+  const priority = ['site', 'sitedata', 'site_data', 'cmdb_site', 'mastersite', 'master_site', 'site_master', 'datasite'];
+  for (const p of priority) for (const n of wb.SheetNames) if (norm(n) === norm(p)) return n;
+  for (const p of priority) for (const n of wb.SheetNames) if (norm(n).includes(norm(p))) return n;
+  for (const n of wb.SheetNames) if (norm(n).includes('site')) return n;
+  return null;
+}
+function detectCMDBHeader(rows, scan = 25) {
+  let bestIdx = 0, bestScore = -1;
+  for (let i = 0; i < Math.min(scan, rows.length); i++) {
+    const r = rows[i];
+    if (!r || !r.length) continue;
+    let score = 0;
+    for (const alias of CMDB_NEEDED_COLS) if (autoMatch(alias, r)) score++;
+    if (r.some(h => norm(h).includes('site') && norm(h).includes('id'))) score += 20;
+    if (r.some(h => norm(h).includes('mc') && (norm(h).includes('cluster') || norm(h).includes('area')))) score += 10;
+    if (r.some(h => norm(h).includes('hub') && norm(h).includes('type'))) score += 10;
+    if (score > bestScore) { bestScore = score; bestIdx = i; }
+  }
+  return { idx: bestIdx, score: bestScore };
+}
+function resolveCMDBColumns(header) {
+  const map = {}, detected = [], missing = [];
+  for (const alias of CMDB_NEEDED_COLS) {
+    const f = autoMatch(alias, header);
+    if (f) { map[alias] = header.indexOf(f); detected.push(`${alias}="${f}"`); }
+    else { map[alias] = -1; missing.push(alias); }
+  }
+  log('✅ CMDB columns (' + detected.length + '/' + CMDB_NEEDED_COLS.length + '): ' + detected.join(' · '));
+  if (missing.length) log('⚠️ Missing: ' + missing.join(', '));
+  const criticalMissing = CMDB_CRITICAL_COLS.filter(c => map[c] < 0);
+  if (criticalMissing.length) log('❌ CRITICAL MISSING: ' + criticalMissing.join(', '));
+  else log('✅ All critical columns present');
+  return { map, detected, missing, criticalMissing };
+}
+
+/* ═══════════════ BEST MC MATCH ═══════════════ */
+function findBestMCMatch(targetMC) {
+  if (!targetMC) return null;
+  const tn = normMCKey(targetMC);
+  if (!tn) return null;
+  if (CMDB_CACHE.statsByMC.has(tn)) return tn;
+  for (const [key] of CMDB_CACHE.statsByMC) {
+    if (!key) continue;
+    if (key.includes(tn) || tn.includes(key)) return key;
+  }
+  return null;
+}
+
+/* ═══════════════ CHUNKED CMDB LOADING ═══════════════ */
+async function loadCMDBInChunks(dataRows, header, colIdxMap, siteKeyFn) {
   clearCMDB();
   const sidColIdx = colIdxMap['Site Id'];
   const mcColIdx = colIdxMap['MC Cluster'];
@@ -489,28 +560,23 @@ async function loadCMDBInChunks(cmdbRowsRaw, cmdbHeader, colIdxMap, siteKeyFn) {
   const clsColIdx = colIdxMap['Site Priority Label'];
   const hgColIdx = colIdxMap['Has Generator'];
   const dsColIdx = colIdxMap['DG Status'];
+  if (sidColIdx < 0) throw new Error('Kolom "Site Id" tidak ditemukan di CMDB Site');
   
-  const dataRows = cmdbRowsRaw;
   const total = dataRows.length;
   const numChunks = Math.ceil(total / CHUNK_SIZE_CMDB) || 1;
-  
   CMDB_CACHE.globalStats = emptyStats('ALL');
-  
   let processed = 0, skipped = 0;
-  log(`📦 CMDB chunking: ${total.toLocaleString('id-ID')} rows → ${numChunks} chunks (${CHUNK_SIZE_CMDB}/chunk)`);
+  log(`📦 CMDB chunking: ${total.toLocaleString('id-ID')} rows → ${numChunks} chunks`);
   
   for (let c = 0; c < numChunks; c++) {
-    const start = c * CHUNK_SIZE_CMDB;
-    const end = Math.min(start + CHUNK_SIZE_CMDB, total);
+    const start = c * CHUNK_SIZE_CMDB, end = Math.min(start + CHUNK_SIZE_CMDB, total);
     const chunkMap = new Map();
-    
     for (let i = start; i < end; i++) {
       const r = dataRows[i];
       if (!r || r.length === 0) { skipped++; continue; }
       const sid = siteKeyFn(r[sidColIdx]);
       if (!sid) { skipped++; continue; }
       if (CMDB_CACHE.index.has(sid)) { skipped++; continue; }
-      
       const comp = new Array(CMDB_NEEDED_COLS.length);
       for (let k = 0; k < CMDB_NEEDED_COLS.length; k++) {
         const idx = colIdxMap[CMDB_NEEDED_COLS[k]];
@@ -519,16 +585,13 @@ async function loadCMDBInChunks(cmdbRowsRaw, cmdbHeader, colIdxMap, siteKeyFn) {
       chunkMap.set(sid, comp);
       CMDB_CACHE.index.set(sid, c);
       processed++;
-      
       const mcRaw = mcColIdx >= 0 ? String(r[mcColIdx] || '').trim() : '';
       const hub = hubColIdx >= 0 ? String(r[hubColIdx] || '') : '';
       const cls = clsColIdx >= 0 ? String(r[clsColIdx] || '') : '';
       const hg = hgColIdx >= 0 ? String(r[hgColIdx] || '').toUpperCase() : '';
       const ds = dsColIdx >= 0 ? String(r[dsColIdx] || '').toUpperCase() : '';
       const hasDG = hg.includes('YES')||hg.includes('AVAILABLE')||ds.includes('ACTIVE')||ds.includes('RUN');
-      
       incrementStats(CMDB_CACHE.globalStats, hub, cls, hasDG);
-      
       if (mcRaw) {
         const mcKey = normMCKey(mcRaw);
         if (mcKey) {
@@ -538,36 +601,19 @@ async function loadCMDBInChunks(cmdbRowsRaw, cmdbHeader, colIdxMap, siteKeyFn) {
         }
       }
     }
-    
     CMDB_CACHE.chunks.push(chunkMap);
-    
     const pct = Math.round((end/total)*100);
     document.getElementById('det-base').textContent = `CMDB ${c+1}/${numChunks} · ${end.toLocaleString('id-ID')}/${total.toLocaleString('id-ID')} (${pct}%)`;
-    log(`📦 Chunk ${c+1}/${numChunks} · ${processed.toLocaleString('id-ID')} processed · ${skipped} skipped`);
-    
     await sleep(0);
   }
-  
-  CMDB_CACHE.meta = {
-    rows: total, cols: (cmdbHeader || []).length,
-    chunks: numChunks, processed, skipped,
-    sites: CMDB_CACHE.index.size,
-    mcCount: CMDB_CACHE.statsByMC.size,
-    loadedAt: new Date().toLocaleTimeString('id-ID'),
-    loadedAtISO: new Date().toISOString(),
-    signature: null
-  };
-  
   dataRows.length = 0;
-  log(`✅ CMDB cache ready: ${CMDB_CACHE.index.size.toLocaleString('id-ID')} sites · ${numChunks} chunks · ${CMDB_CACHE.statsByMC.size} MC`);
-  updateCMDBBadge();
+  log(`✅ CMDB ready: ${CMDB_CACHE.index.size.toLocaleString('id-ID')} sites · ${numChunks} chunks · ${CMDB_CACHE.statsByMC.size} MC · ${skipped} skipped`);
 }
-
 function cmdbGet(sidKey, alias) {
   if (!sidKey) return '';
-  const chunkIdx = CMDB_CACHE.index.get(sidKey);
-  if (chunkIdx === undefined) return '';
-  const chunk = CMDB_CACHE.chunks[chunkIdx];
+  const ci = CMDB_CACHE.index.get(sidKey);
+  if (ci === undefined) return '';
+  const chunk = CMDB_CACHE.chunks[ci];
   if (!chunk) return '';
   const row = chunk.get(sidKey);
   if (!row) return '';
@@ -576,28 +622,20 @@ function cmdbGet(sidKey, alias) {
   const v = row[idx];
   return v !== '' && v != null ? v : '';
 }
-
 function computeCMDBStats(mc) {
   let stats = CMDB_CACHE.globalStats;
   if (mc) {
-    const s = CMDB_CACHE.statsByMC.get(normMCKey(mc));
-    if (s) stats = s;
+    const key = findBestMCMatch(mc);
+    if (key) { const s = CMDB_CACHE.statsByMC.get(key); if (s) stats = s; }
   }
   if (!stats) return { totalSiteMC:0, bigMedYes:0, bigMedNo:0, critYes:0, critNo:0 };
-  return {
-    totalSiteMC: stats.total || 0,
-    bigMedYes: stats.bigMedDG || 0,
-    bigMedNo: stats.bigMedNoDG || 0,
-    critYes: stats.criticalDG || 0,
-    critNo: stats.criticalNoDG || 0
-  };
+  return { totalSiteMC: stats.total || 0, bigMedYes: stats.bigMedDG || 0, bigMedNo: stats.bigMedNoDG || 0, critYes: stats.criticalDG || 0, critNo: stats.criticalNoDG || 0 };
 }
-
 function getHubTotalByMC(mc, hubKey) {
   let stats = CMDB_CACHE.globalStats;
   if (mc) {
-    const s = CMDB_CACHE.statsByMC.get(normMCKey(mc));
-    if (s) stats = s;
+    const key = findBestMCMatch(mc);
+    if (key) { const s = CMDB_CACHE.statsByMC.get(key); if (s) stats = s; }
   }
   if (!stats) return 0;
   if (hubKey === 'big') return stats.big || 0;
@@ -605,6 +643,72 @@ function getHubTotalByMC(mc, hubKey) {
   if (hubKey === 'small') return stats.small || 0;
   if (hubKey === 'end') return stats.end || 0;
   return stats.total || 0;
+}
+
+/* ═══════════════ EXTRACT SUMMARY REPORT VALUES ═══════════════ */
+function extractSummaryReportValues(summaryRows, targetMC) {
+  const result = { totalDown: null, matched: 0, source: 'none', mcCol: null, downCol: null, timeCol: null, latestRow: null };
+  if (!summaryRows || summaryRows.length < 2) return result;
+  
+  const hdrIdx = (() => { const h = findHeaderRow(summaryRows, DIAG_COLS); return h >= 0 ? h : 0; })();
+  const header = summaryRows[hdrIdx] || [];
+  
+  let mcCol = -1;
+  for (const alias of ['Remark','MC Cluster','MC Area','MC','Region']) {
+    const f = autoMatch(alias, header);
+    if (f) { mcCol = header.indexOf(f); break; }
+  }
+  if (mcCol < 0) mcCol = 2;
+  
+  let downCol = -1;
+  for (const alias of ['Total Sites Down','Sites Down','Total Down','Site Down']) {
+    const f = autoMatch(alias, header);
+    if (f) { downCol = header.indexOf(f); break; }
+  }
+  if (downCol < 0) downCol = 3;
+  
+  let timeCol = -1;
+  for (const alias of ['BCP Time','Time','Snapshot']) {
+    const f = autoMatch(alias, header);
+    if (f) { timeCol = header.indexOf(f); break; }
+  }
+  
+  result.mcCol = mcCol; result.downCol = downCol; result.timeCol = timeCol;
+  
+  const dataRows = summaryRows.slice(hdrIdx + 1).filter(r => r && r.some(c => c !== '' && c != null));
+  const targetNorm = normMCKey(targetMC);
+  
+  let matched = [];
+  for (const r of dataRows) {
+    const mcNorm = normMCKey(String(r[mcCol] || '').trim());
+    if (targetNorm && mcNorm && (mcNorm === targetNorm || mcNorm.includes(targetNorm) || targetNorm.includes(mcNorm))) {
+      matched.push(r);
+    }
+  }
+  result.matched = matched.length;
+  
+  if (matched.length === 0 && dataRows.length > 0) {
+    const uniqueMCs = new Set();
+    for (const r of dataRows) { const v = String(r[mcCol] || '').trim(); if (v) uniqueMCs.add(normMCKey(v)); }
+    if (uniqueMCs.size <= 1) { matched = dataRows; result.source = 'single_mc'; }
+  } else if (matched.length > 0) {
+    result.source = 'matched';
+  }
+  
+  if (matched.length === 0) return result;
+  
+  let sorted = matched.slice();
+  if (timeCol >= 0) {
+    sorted.sort((a, b) => String(a[timeCol] || '').trim().localeCompare(String(b[timeCol] || '').trim()));
+  }
+  const latest = sorted[sorted.length - 1];
+  result.latestRow = latest;
+  
+  const downNum = parseFloat(String(latest[downCol] ?? '').replace(/[^\d.-]/g, '')) || 0;
+  result.totalDown = Math.round(downNum);
+  
+  log(`📊 Summary Report: ${result.matched} matched (${result.source}) · kolom C=${mcCol} D=${downCol} · latest down=${result.totalDown}`);
+  return result;
 }
 
 /* ═══════════════ UTIL ═══════════════ */
@@ -769,16 +873,10 @@ function bindDrop(zoneId, inputId, key) {
 function setFile(key, file) {
   const validExt = key === 'zip' ? /\.zip$/i.test(file.name) : /\.(xlsx|xls|csv)$/i.test(file.name);
   if (!validExt) { toast(key === 'zip' ? 'Harus file .zip' : 'Format harus .xlsx / .xls / .csv', 'error'); return; }
-  
   if (key === 'pot') potFile = file;
   else if (key === 'seg') segFile = file;
-  else if (key === 'cmdb') {
-    cmdbFile = file;
-    clearCMDB();
-    log(`🆕 CMDB baru diupload — cache lama dibersihkan`);
-  }
+  else if (key === 'cmdb') { cmdbFile = file; clearCMDB(); log(`🆕 CMDB baru — cache cleared`); }
   else zipFile = file;
-  
   document.getElementById('info-' + key).classList.add('show');
   document.getElementById('name-' + key).textContent = file.name;
   document.getElementById('meta-' + key).textContent = fmtBytes(file.size) + ' · ' + new Date().toLocaleTimeString('id-ID');
@@ -906,17 +1004,13 @@ function deriveGensetLabel(sidKey, gdocGensetRaw, segLookup, segHeader) {
 
 /* ═══════════════ BUILD SUMMARY ═══════════════ */
 function buildSummaryFromGDOCPG(params) {
-  const { gdocRows, pgRowsOut, targetMC, siteKeyFn, powerAlarmSites, segLookup, segHeader } = params;
+  const { gdocRows, pgRowsOut, summaryRows, targetMC, siteKeyFn, powerAlarmSites, segLookup, segHeader } = params;
   
   const pgData = pgRowsOut.slice(2);
   const pgFirst = pgData[0] || [];
   const pgLatest = pgData[pgData.length - 1] || [];
-  
   const startTime = String(pgFirst[PG_IDX.TIME] || '').trim();
   const updateTime = String(pgLatest[PG_IDX.TIME] || '').trim();
-  const totalSiteMC = Number(pgLatest[PG_IDX.TOTAL_MC]) || 0;
-  const totalDown = Number(pgLatest[PG_IDX.TOTAL_DOWN]) || 0;
-  const pctDown = totalSiteMC > 0 ? (totalDown / totalSiteMC) * 100 : 0;
   
   let agingStr = '--:--';
   if (startTime && updateTime) {
@@ -951,6 +1045,7 @@ function buildSummaryFromGDOCPG(params) {
     });
   }
   
+  /* Power Alarm cross-ref */
   let powerAlarmCount = 0, powerAlarmMcCount = 0;
   if (powerAlarmSites && powerAlarmSites.size > 0) {
     for (const s of downSites) {
@@ -961,6 +1056,33 @@ function buildSummaryFromGDOCPG(params) {
     }
   }
   
+  /* ═══ NEW: totalDown dari Summary Report, totalSiteMC dari CMDB ═══ */
+  const sdr = extractSummaryReportValues(summaryRows, targetMC);
+  let totalDown, totalDownSource;
+  if (sdr.totalDown !== null && sdr.matched > 0) {
+    totalDown = sdr.totalDown;
+    totalDownSource = 'Summary Report';
+  } else {
+    totalDown = downSites.length;
+    totalDownSource = 'GDOC fallback';
+    if (sdr.totalDown === null) log(`⚠️ Summary Report tidak match MC "${targetMC}" — fallback ke GDOC count (${totalDown})`);
+  }
+  
+  let totalSiteMC = 0;
+  const mcKey = findBestMCMatch(targetMC);
+  if (mcKey) {
+    const stats = CMDB_CACHE.statsByMC.get(mcKey);
+    if (stats) totalSiteMC = stats.total || 0;
+  }
+  if (totalSiteMC === 0) {
+    totalSiteMC = CMDB_CACHE.globalStats?.total || 0;
+    if (totalSiteMC > 0) log(`⚠️ CMDB MC "${targetMC}" tidak match — pakai global total ${totalSiteMC}`);
+  }
+  
+  const pctDown = totalSiteMC > 0 ? (totalDown / totalSiteMC) * 100 : 0;
+  log(`📊 Summary: Down=${totalDown} (${totalDownSource}) · TotalMC=${totalSiteMC} (CMDB) · ${pctDown.toFixed(2)}%`);
+  
+  /* Categories */
   function categorize(site) {
     const cats = [];
     const hub = (site.hubType || '').toUpperCase();
@@ -996,53 +1118,43 @@ function buildSummaryFromGDOCPG(params) {
     const sitesDown = downSites.filter(s => categorize(s).includes(cat.key));
     const down = sitesDown.length;
     let total = 0;
-    if (cat.format === 'pct') {
-      total = getHubTotalByMC(targetMC, cat.key);
-    }
+    if (cat.format === 'pct') total = getHubTotalByMC(targetMC, cat.key);
     let siteList = [];
     if (cat.showSites) {
-      siteList = sitesDown.map(s => ({
-        name: s.name || s.sid,
-        transport: s.transport || '',
-        genset: deriveGensetLabel(s.nid, s.gdocGenset, segLookup, segHeader),
-      }));
+      siteList = sitesDown.map(s => ({ name: s.name || s.sid, transport: s.transport || '', genset: deriveGensetLabel(s.nid, s.gdocGenset, segLookup, segHeader) }));
     }
     categoryResults.push({
       key: cat.key, name: cat.name, format: cat.format, showSites: cat.showSites,
-      down, total, pct: total > 0 ? (down/total)*100 : 0, sites: siteList,
+      down, total, pct: total > 0 ? (down/total)*100 : 0, sites: siteList
     });
   }
   
-  /* MC > 25% — dari statsByMC (O(1) per MC, bukan iterate ribuan site) */
+  /* MC > 25% dari statsByMC */
   const mcUnique = new Map();
-  for (const [mcKey, stats] of CMDB_CACHE.statsByMC) {
-    mcUnique.set(mcKey, { displayName: stats.displayName, down: 0, total: stats.total || 0 });
-  }
+  for (const [k, stats] of CMDB_CACHE.statsByMC) mcUnique.set(k, { displayName: stats.displayName, down: 0, total: stats.total || 0 });
   for (const s of downSites) {
     const mcRaw = (s.mcArea || '').trim();
     if (!mcRaw) continue;
-    const mcKey = normMCKey(mcRaw);
-    if (mcUnique.has(mcKey)) mcUnique.get(mcKey).down++;
+    const k = normMCKey(mcRaw);
+    if (mcUnique.has(k)) mcUnique.get(k).down++;
   }
-  
   if (mcUnique.size === 0 && targetMC) {
     const safeTotal = totalSiteMC > 0 ? totalSiteMC : Math.max(1, totalDown);
     mcUnique.set(normMCKey(targetMC), { displayName: targetMC, down: totalDown, total: safeTotal });
     log(`⚠️ MC 25% fallback: "${targetMC}" (${totalDown}/${safeTotal})`);
   }
-  
   const mcAbove25List = [];
-  for (const [mcKey, stats] of mcUnique) {
+  for (const [k, stats] of mcUnique) {
     const safeTotal = stats.total > 0 ? stats.total : Math.max(1, stats.down);
     const pct = (stats.down / safeTotal) * 100;
     if (pct > 25) mcAbove25List.push({ mc: stats.displayName, down: stats.down, total: safeTotal, pct });
   }
-  log(`📊 MC>25%: ${mcAbove25List.length} MC · unique MC: ${mcUnique.size}`);
+  log(`📊 MC>25%: ${mcAbove25List.length} MC · unique: ${mcUnique.size}`);
   
   return {
-    agingStr, startTime, updateTime, totalDown, totalSiteMC, pctDown,
+    agingStr, startTime, updateTime, totalDown, totalDownSource, totalSiteMC, pctDown,
     powerAlarmCount, powerAlarmMcCount,
-    categoryResults, mcAbove25List, targetMC,
+    categoryResults, mcAbove25List, targetMC
   };
 }
 
@@ -1064,11 +1176,8 @@ function generateSummaryText(summary) {
     
     let idx = 1;
     for (const cat of summary.categoryResults) {
-      if (cat.format === 'pct') {
-        lines.push(`${idx}. ${cat.name} = ${cat.down}/${cat.total} (${cat.pct.toFixed(2)}%)`);
-      } else {
-        lines.push(`${idx}. ${cat.name} = ${cat.down}`);
-      }
+      if (cat.format === 'pct') lines.push(`${idx}. ${cat.name} = ${cat.down}/${cat.total} (${cat.pct.toFixed(2)}%)`);
+      else lines.push(`${idx}. ${cat.name} = ${cat.down}`);
       if (cat.showSites && cat.sites && cat.sites.length > 0) {
         for (const s of cat.sites) {
           const parts = [s.name || s.sid || ''];
@@ -1086,7 +1195,6 @@ function generateSummaryText(summary) {
     if (summary.mcAbove25List && summary.mcAbove25List.length > 0) {
       for (const m of summary.mcAbove25List) lines.push(m.mc);
     }
-    
     lines.push('_DIOC and FSO on coordinate for Power monitoring and Portable Genset movement_');
     return lines.join('\n');
   } catch (err) {
@@ -1095,7 +1203,6 @@ function generateSummaryText(summary) {
   }
 }
 
-/* ═══════════════ COPY ═══════════════ */
 async function copySummaryText() {
   const text = document.getElementById('summary-text').value;
   if (!text) { toast('Summary kosong', 'warn'); return; }
@@ -1118,7 +1225,6 @@ function selectAllSummaryText() {
   toast('✂️ Text terpilih — tekan Ctrl+C untuk copy', 'success');
 }
 
-/* ═══════════════ RENDER SUMMARY ═══════════════ */
 function renderSummary(summary) {
   try {
     const text = generateSummaryText(summary);
@@ -1169,7 +1275,7 @@ async function process() {
     doneStage('stage-pot', summaryRows.length + ' baris · ' + summaryName);
     await sleep(100);
 
-    /* 2. SEG + CMDB READ (with cache signature check) */
+    /* 2. SEG + CMDB READ */
     startStage('stage-seg');
     await sleep(100);
     const segBuf = await segFile.arrayBuffer();
@@ -1178,51 +1284,56 @@ async function process() {
     const segRowsRaw = sheetToAOA(segWb, segName);
     log('SEG: ' + segRowsRaw.length + ' baris');
 
-    let cmdbRowsRaw = null;
-    let cmdbHeaderStore = null;
-    let cmdbColIdxMapStore = null;
-    let cmdbSignature = null;
+    let cmdbRowsRaw = null, cmdbHeaderStore = null, cmdbColIdxMapStore = null;
+    let cmdbSignature = null, cmdbSheetUsed = null, cmdbHeaderIdx = null;
 
     if (cmdbFile) {
       cmdbSignature = `${cmdbFile.name}|${cmdbFile.size}|${cmdbFile.lastModified}`;
       if (CMDB_CACHE.meta.signature === cmdbSignature && CMDB_CACHE.meta.sites > 0) {
-        log(`♻️ CMDB cache valid — skip re-read (signature match)`);
+        log(`♻️ CMDB cache valid — skip re-read`);
+        cmdbSheetUsed = CMDB_CACHE.meta.sheetName;
+        cmdbHeaderIdx = CMDB_CACHE.meta.headerIdx;
       } else {
         try {
           const cmdbBuf = await cmdbFile.arrayBuffer();
           const cmdbWb = XLSX.read(cmdbBuf, {type:'array', cellDates:false, cellNF:false, cellText:false});
-          cmdbRowsRaw = sheetToAOA(cmbdbWb, cmdbWb.SheetNames[0]);
-          log('✅ CMDB read: ' + cmdbRowsRaw.length + ' baris × ' + (cmdbRowsRaw[0]||[]).length + ' kolom');
+          log('CMDB sheets: ' + cmdbWb.SheetNames.join(' | '));
           
-          let hIdx = 0;
-          for (let i = 0; i < Math.min(5, cmdbRowsRaw.length); i++) {
-            const r = cmdbRowsRaw[i] || [];
-            if (r.some(h => norm(h).includes('site') && norm(h).includes('id'))) { hIdx = i; break; }
-          }
-          cmdbHeaderStore = cmdbRowsRaw[hIdx] || [];
-          cmdbColIdxMapStore = {};
-          for (const alias of CMDB_NEEDED_COLS) {
-            const f = autoMatch(alias, cmdbHeaderStore);
-            cmdbColIdxMapStore[alias] = f ? cmdbHeaderStore.indexOf(f) : -1;
-          }
-          const kept = CMDB_NEEDED_COLS.filter(a => cmdbColIdxMapStore[a] >= 0).length;
-          log(`CMDB selective: ${kept}/${CMDB_NEEDED_COLS.length} kolom`);
-          cmdbRowsRaw = cmdbRowsRaw.slice(hIdx + 1);
+          let sheetName = findCMDBSheet(cmdbWb);
+          if (sheetName) log(`✅ CMDB "Site" sheet: "${sheetName}"`);
+          else { sheetName = cmdbWb.SheetNames[0]; log(`⚠️ Sheet "Site" tidak ada · fallback "${sheetName}"`); }
+          cmdbSheetUsed = sheetName;
+          
+          const rawRows = sheetToAOA(cmbdWb, sheetName);
+          log(`📄 CMDB raw rows: ${rawRows.length}`);
+          
+          const hdrDetect = detectCMDBHeader(rawRows, 25);
+          cmdbHeaderIdx = hdrDetect.idx;
+          log(`📌 Header row: index ${hdrDetect.idx} (score: ${hdrDetect.score})`);
+          
+          cmdbHeaderStore = rawRows[hdrDetect.idx] || [];
+          log(`📊 Header cols (${cmdbHeaderStore.length}): ${cmdbHeaderStore.slice(0, 20).join(' | ')}...`);
+          
+          const resolved = resolveCMDBColumns(cmdbHeaderStore);
+          cmdbColIdxMapStore = resolved.map;
+          
+          cmdbRowsRaw = rawRows.slice(hdrDetect.idx + 1);
+          log(`✅ CMDB ready: ${cmdbRowsRaw.length} rows`);
         } catch (e) {
           log('⚠️ CMDB gagal: ' + e.message);
+          console.error(e);
         }
       }
     } else {
       log('ℹ️ CMDB tidak diupload');
     }
-    doneStage('stage-seg', segRowsRaw.length + ' SEG · ' + (cmdbRowsRaw ? cmdbRowsRaw.length + ' CMDB (raw)' : (CMDB_CACHE.meta.sites > 0 ? CMDB_CACHE.meta.sites + ' cached' : '-')));
+    doneStage('stage-seg', segRowsRaw.length + ' SEG · ' + (cmdbRowsRaw ? cmdbRowsRaw.length + ' CMDB' : (CMDB_CACHE.meta.sites > 0 ? CMDB_CACHE.meta.sites + ' cached' : '-')));
     await sleep(100);
 
     /* 3. ZIP */
     startStage('stage-zip');
     await sleep(100);
-    let zipFoundSites = new Set();
-    let zipFileCount = 0;
+    let zipFoundSites = new Set(), zipFileCount = 0;
     if (zipFile && window.JSZip) {
       try {
         const sdlNamePre = findSDLSheet(potWb);
@@ -1311,7 +1422,6 @@ async function process() {
         segSiteIdSet.add(sidKey);
         const arr = segLookup.get(sidKey); if (arr) arr.push(r); else segLookup.set(sidKey, [r]);
       }
-      log('SEG lookup: ' + segLookup.size + ' site unik');
     }
 
     const sdlSideMap = new Map();
@@ -1328,14 +1438,15 @@ async function process() {
       return v !== '' && v != null ? v : '';
     }
 
-    /* CMDB CHUNKING */
+    /* CMDB Chunking */
     if (cmdbRowsRaw && cmdbHeaderStore && cmdbColIdxMapStore) {
       await loadCMDBInChunks(cmdbRowsRaw, cmdbHeaderStore, cmdbColIdxMapStore, siteKeyFn);
       CMDB_CACHE.meta.signature = cmdbSignature;
+      CMDB_CACHE.meta.sheetName = cmdbSheetUsed;
+      CMDB_CACHE.meta.headerIdx = cmdbHeaderIdx;
+      CMDB_CACHE.meta.criticalMissing = CMDB_CRITICAL_COLS.filter(c => cmdbColIdxMapStore[c] < 0);
       cmdbRowsRaw = null;
-      cmdbRowsRaw = null;  // double-hint GC
-    } else if (!cmdbFile) {
-      log('ℹ️ No CMDB — stats akan kosong');
+      updateCMDBBadge();
     }
 
     const statusByRow = [];
@@ -1393,7 +1504,6 @@ async function process() {
     }
 
     const segRowsOut = [outHeader];
-
     for (let i = 0; i < sdlData.length; i++) {
       const sdlRow = sdlData[i];
       const sidRaw = sdlRow[sdlSiteIdx];
@@ -1402,7 +1512,6 @@ async function process() {
       if (filterMode === 'down' && status !== 'DOWN') continue;
       if (filterMode === 'up' && status !== 'UP') continue;
       const recoveryNote = status === 'UP' ? 'Site tidak ada di Segmentation Info (sudah UP)' : '';
-
       let rowOut;
       if (useDyn) {
         rowOut = [];
@@ -1489,14 +1598,13 @@ async function process() {
     const sortedKeys = Array.from(keyGroups.keys()).sort((a,b) => keyGroups.get(a).snapshotTime.localeCompare(keyGroups.get(b).snapshotTime));
     const keyColorMap = {};
     sortedKeys.forEach((k,i) => { keyColorMap[k] = SNAPSHOT_COLORS[i % SNAPSHOT_COLORS.length]; });
-    log('Key groups: ' + sortedKeys.length);
 
     const mcIdx = outHeader.indexOf('MC');
     const targetMC = (segRowsOut[1] && mcIdx>=0) ? String(segRowsOut[1][mcIdx]??'').trim() : '';
     log('Target MC: "' + targetMC + '"');
 
     const cmdbStats = computeCMDBStats(targetMC);
-    log('CMDB stats: Total=' + cmdbStats.totalSiteMC);
+    log(`📊 CMDB stats MC "${targetMC}": Total=${cmdbStats.totalSiteMC}`);
 
     const pgRowsOut = [PG_CATEGORIES.slice(), PG_COLS.slice()];
     for (const key of sortedKeys) {
@@ -1542,7 +1650,6 @@ async function process() {
       const origSdl = sdlSideMap.get(rKey+'||'+sidKey) || null;
       const get = col => r[outHeader.indexOf(col)] ?? '';
       const statusVal = get('Status') || 'DOWN';
-
       let scRaw = sdlGet(origSdl,'Site Class(Priority)')||sdlGet(origSdl,'Site Class')||cmdbGet(sidKey,'Site Priority Label')||get('Site Class(Priority)');
       const sc = dedupeValues(scRaw,'/');
       const ss = sdlGet(origSdl,'Super Sites')||sdlGet(origSdl,'Is Hub')||cmdbGet(sidKey,'Is Hub')||'No';
@@ -1554,12 +1661,13 @@ async function process() {
       const ht = cmdbGet(sidKey,'HUB Type')||get('Hub Type');
       const fo = cmdbGet(sidKey,'FM Office*');
       const rs = cmdbGet(sidKey,'Rts Name')||cmdbGet(sidKey,'Rts Id');
-
       gdocRowsOut.push([get('MC')||cmdbGet(sidKey,'MC Cluster'),mc25,rSid,sn,statusVal,ht,get('Transport Outage'),permGen(sidKey),sc,ss,t2,p0,vv,vi,'','',fo,rs,'','']);
     }
 
+    /* ═══ SUMMARY — pass summaryRows ═══ */
     const summary = buildSummaryFromGDOCPG({
       gdocRows: gdocRowsOut, pgRowsOut,
+      summaryRows,
       targetMC, siteKeyFn,
       powerAlarmSites: zipFoundSites, segLookup, segHeader
     });
@@ -1642,7 +1750,7 @@ async function process() {
     doneStage('stage-excel', fmtBytes(lastOutputBlob.size));
 
     const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
-    document.getElementById('perf-note').innerHTML = `⚡ Selesai dalam <b>${elapsed}s</b> · CMDB ${CMDB_CACHE.meta.sites.toLocaleString('id-ID')} sites cached`;
+    document.getElementById('perf-note').innerHTML = `⚡ Selesai dalam <b>${elapsed}s</b> · Down source: ${summary.totalDownSource || '-'}`;
 
     animateNumber(document.getElementById('stat-diag'), diagRowsOut.length-1);
     animateNumber(document.getElementById('stat-seg'), segRowsOut.length-1);
@@ -1732,7 +1840,7 @@ bindDrop('dz-cmdb','file-cmdb','cmdb');
 bindDrop('dz-zip','file-zip','zip');
 CMDB_CACHE.globalStats = emptyStats('ALL');
 updateCMDBBadge();
-log('Aplikasi siap · Auto chunking CMDB + Cache system aktif');
+log('Aplikasi siap · Summary Report-driven + CMDB fuzzy MC match');
 </script>
 </body>
 </html>
