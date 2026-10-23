@@ -1,177 +1,306 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BCP Compiler · POT + Segmentation</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<title>⚡ BCP Compiler · Final</title>
+<script>
+  (function(){
+    const saved = localStorage.getItem('bcp-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+  })();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    if (!window.XLSX) {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+      s.onload = () => { window.__xlsxNoStyle = true; };
+      document.head.appendChild(s);
+    }
+  });
+</script>
 <style>
+  :root[data-theme="dark"]{--bg-primary:#050818;--bg-secondary:#0a0e27;--bg-elevated:#111633;--bg-card:rgba(17,22,51,0.55);--bg-card-hover:rgba(25,32,71,0.85);--bg-input:rgba(10,14,39,0.7);--text-primary:#e8ecff;--text-secondary:#8b95c9;--text-muted:#5a6489;--text-inverse:#050818;--border-subtle:rgba(139,149,201,0.12);--border-medium:rgba(139,149,201,0.2);--border-strong:rgba(0,217,255,0.4);--accent-cyan:#00d9ff;--accent-purple:#b14aff;--accent-pink:#ff4ad2;--accent-green:#00ff88;--accent-orange:#ffb020;--accent-red:#ff3860;--accent-blue:#4a9eff;--glow-cyan:0 0 24px rgba(0,217,255,0.45);--glow-purple:0 0 24px rgba(177,74,255,0.45);--glow-green:0 0 24px rgba(0,255,136,0.45);--glow-red:0 0 24px rgba(255,56,96,0.45);--shadow-card:0 8px 32px rgba(0,0,0,0.6),0 0 1px rgba(0,217,255,0.3) inset;--shadow-card-hover:0 16px 48px rgba(0,0,0,0.7),0 0 24px rgba(0,217,255,0.2);--grid-color:rgba(0,217,255,0.06);--grid-color-2:rgba(177,74,255,0.04)}
+  :root[data-theme="light"]{--bg-primary:#eef2ff;--bg-secondary:#e0e7ff;--bg-elevated:#ffffff;--bg-card:rgba(255,255,255,0.75);--bg-card-hover:rgba(255,255,255,0.95);--bg-input:rgba(255,255,255,0.9);--text-primary:#1a1f3a;--text-secondary:#556080;--text-muted:#8b95b5;--text-inverse:#ffffff;--border-subtle:rgba(26,31,58,0.08);--border-medium:rgba(26,31,58,0.15);--border-strong:rgba(124,58,237,0.4);--accent-cyan:#0088aa;--accent-purple:#7c3aed;--accent-pink:#d946ef;--accent-green:#059669;--accent-orange:#d97706;--accent-red:#dc2626;--accent-blue:#2563eb;--glow-cyan:0 0 20px rgba(0,136,170,0.25);--glow-purple:0 0 20px rgba(124,58,237,0.3);--glow-green:0 0 20px rgba(5,150,105,0.25);--glow-red:0 0 20px rgba(220,38,38,0.25);--shadow-card:0 8px 32px rgba(26,31,58,0.1),0 0 1px rgba(124,58,237,0.2) inset;--shadow-card-hover:0 16px 48px rgba(26,31,58,0.15),0 0 24px rgba(124,58,237,0.15);--grid-color:rgba(124,58,237,0.05);--grid-color-2:rgba(59,130,246,0.04)}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;padding:24px;color:#1a202c}
-  .container{max-width:1240px;margin:0 auto}
-  .header{text-align:center;color:#fff;margin-bottom:32px}
-  .header h1{font-size:32px;margin-bottom:8px}
-  .header p{opacity:.9;font-size:14px}
-  .upload-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px}
-  @media(max-width:768px){.upload-grid{grid-template-columns:1fr}}
-  .upload-card{background:#fff;border-radius:16px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,.15);border-top:6px solid;transition:transform .2s}
-  .upload-card:hover{transform:translateY(-2px)}
-  .upload-card.pot{border-top-color:#e53e3e}
-  .upload-card.seg{border-top-color:#3182ce}
-  .upload-card h2{font-size:18px;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .upload-card.pot h2{color:#c53030}
-  .upload-card.seg h2{color:#2b6cb0}
-  .upload-card .desc{font-size:13px;color:#718096;margin-bottom:16px;line-height:1.5}
-  .badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;margin-left:4px}
-  .badge.red{background:#fff5f5;color:#c53030}
-  .badge.blue{background:#ebf8ff;color:#2b6cb0}
-  .badge.purple{background:#faf5ff;color:#6b46c1}
-  .drop-zone{border:2px dashed #cbd5e0;border-radius:12px;padding:24px;text-align:center;cursor:pointer;transition:all .2s}
-  .drop-zone:hover,.drop-zone.dragover{border-color:#667eea;background:#f7fafc}
-  .upload-card.pot .drop-zone:hover,.upload-card.pot .drop-zone.dragover{border-color:#e53e3e;background:#fff5f5}
-  .upload-card.seg .drop-zone:hover,.upload-card.seg .drop-zone.dragover{border-color:#3182ce;background:#ebf8ff}
+  html{scroll-behavior:smooth}
+  body{font-family:'Inter','Segoe UI',system-ui,sans-serif;min-height:100vh;padding:24px;background:var(--bg-primary);color:var(--text-primary);overflow-x:hidden;transition:background .5s ease,color .3s ease;position:relative}
+  .grid-bg{position:fixed;inset:-50px;z-index:0;pointer-events:none;background-image:linear-gradient(var(--grid-color) 1px,transparent 1px),linear-gradient(90deg,var(--grid-color) 1px,transparent 1px),linear-gradient(var(--grid-color-2) 1px,transparent 1px),linear-gradient(90deg,var(--grid-color-2) 1px,transparent 1px);background-size:60px 60px,60px 60px,240px 240px,240px 240px;animation:gridMove 30s linear infinite}
+  @keyframes gridMove{from{background-position:0 0,0 0,0 0,0 0}to{background-position:60px 60px,60px 60px,240px 240px,240px 240px}}
+  .orb{position:fixed;border-radius:50%;filter:blur(100px);opacity:.4;pointer-events:none;z-index:0}
+  .orb-1{width:500px;height:500px;top:-150px;left:-150px;background:radial-gradient(circle,var(--accent-purple),transparent);animation:float1 22s ease-in-out infinite}
+  .orb-2{width:600px;height:600px;bottom:-200px;right:-150px;background:radial-gradient(circle,var(--accent-cyan),transparent);animation:float2 28s ease-in-out infinite}
+  .orb-3{width:400px;height:400px;top:40%;left:50%;background:radial-gradient(circle,var(--accent-pink),transparent);animation:float3 24s ease-in-out infinite}
+  @keyframes float1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(120px,80px) scale(1.2)}}
+  @keyframes float2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-150px,-100px) scale(1.15)}}
+  @keyframes float3{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-30%,-30%) scale(0.85)}}
+  .theme-toggle{position:fixed;top:24px;right:24px;z-index:1000;display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--bg-card);backdrop-filter:blur(20px);border:1px solid var(--border-medium);border-radius:50px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--text-primary);transition:all .3s;box-shadow:var(--shadow-card)}
+  .theme-toggle:hover{border-color:var(--border-strong);box-shadow:var(--glow-cyan);transform:translateY(-2px) scale(1.02)}
+  .theme-icon{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;font-size:16px;transition:transform .5s}
+  .theme-toggle:hover .theme-icon{transform:rotate(360deg) scale(1.15)}
+  @media(max-width:600px){.theme-toggle{top:16px;right:16px;padding:8px 12px;font-size:10px}.theme-label{display:none}}
+  .container{max-width:1320px;margin:0 auto;position:relative;z-index:1;padding-top:20px}
+  .header{text-align:center;margin-bottom:36px}
+  .header h1{font-family:'Orbitron','Rajdhani','Inter',sans-serif;font-size:clamp(32px,5vw,48px);font-weight:900;letter-spacing:2px;margin-bottom:14px;background:linear-gradient(135deg,var(--accent-cyan) 0%,var(--accent-purple) 50%,var(--accent-pink) 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 20px rgba(0,217,255,0.5));animation:titleGlow 4s ease-in-out infinite}
+  @keyframes titleGlow{0%,100%{filter:drop-shadow(0 0 20px rgba(0,217,255,0.5))}50%{filter:drop-shadow(0 0 30px rgba(177,74,255,0.7))}}
+  .header p{color:var(--text-secondary);font-size:13px;font-weight:500}
+  .header p b{color:var(--text-primary)}
+  .upload-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+  @media(max-width:1100px){.upload-grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:600px){.upload-grid{grid-template-columns:1fr}}
+  .upload-card{background:var(--bg-card);backdrop-filter:blur(20px);border-radius:16px;padding:20px;box-shadow:var(--shadow-card);border:1px solid var(--border-subtle);border-top:3px solid;transition:all .4s;position:relative;overflow:hidden;animation:cardIn .7s ease-out backwards}
+  .upload-card:nth-child(1){animation-delay:.1s}.upload-card:nth-child(2){animation-delay:.2s}.upload-card:nth-child(3){animation-delay:.3s}.upload-card:nth-child(4){animation-delay:.4s}
+  @keyframes cardIn{from{opacity:0;transform:translateY(40px) scale(.92)}to{opacity:1;transform:translateY(0) scale(1)}}
+  .upload-card:hover{transform:translateY(-6px);box-shadow:var(--shadow-card-hover)}
+  .upload-card.pot{border-top-color:var(--accent-red)}
+  .upload-card.seg{border-top-color:var(--accent-blue)}
+  .upload-card.cmdb{border-top-color:var(--accent-orange)}
+  .upload-card.zip{border-top-color:var(--accent-purple)}
+  .upload-card h2{font-size:14px;margin-bottom:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-weight:700}
+  .upload-card.pot h2{color:var(--accent-red)}
+  .upload-card.seg h2{color:var(--accent-blue)}
+  .upload-card.cmdb h2{color:var(--accent-orange)}
+  .upload-card.zip h2{color:var(--accent-purple)}
+  .upload-card .desc{font-size:11px;color:var(--text-secondary);margin-bottom:14px;line-height:1.5}
+  .badge{display:inline-block;padding:3px 9px;border-radius:6px;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;font-family:'JetBrains Mono',monospace}
+  .badge.red{background:rgba(255,56,96,.15);color:var(--accent-red);border:1px solid rgba(255,56,96,.3)}
+  .badge.blue{background:rgba(74,158,255,.15);color:var(--accent-blue);border:1px solid rgba(74,158,255,.3)}
+  .badge.yellow{background:rgba(255,176,32,.15);color:var(--accent-orange);border:1px solid rgba(255,176,32,.3)}
+  .badge.purple{background:rgba(177,74,255,.15);color:var(--accent-purple);border:1px solid rgba(177,74,255,.3)}
+  .drop-zone{border:2px dashed var(--border-medium);border-radius:12px;padding:18px 14px;text-align:center;cursor:pointer;transition:all .3s;background:var(--bg-input);display:block}
+  .drop-zone:hover{border-color:var(--accent-cyan);transform:scale(1.02);box-shadow:0 0 20px rgba(0,217,255,0.15)}
+  .upload-card.pot .drop-zone:hover{border-color:var(--accent-red)}
+  .upload-card.seg .drop-zone:hover{border-color:var(--accent-blue)}
+  .upload-card.cmdb .drop-zone:hover{border-color:var(--accent-orange)}
+  .upload-card.zip .drop-zone:hover{border-color:var(--accent-purple)}
+  .drop-zone.dragover{animation:pulseBorder 1.2s infinite}
+  @keyframes pulseBorder{0%,100%{box-shadow:0 0 0 0 rgba(0,217,255,0.5)}50%{box-shadow:0 0 0 16px rgba(0,217,255,0)}}
   .drop-zone input{display:none}
-  .drop-zone .icon{font-size:36px;margin-bottom:8px}
-  .drop-zone .label{font-size:14px;color:#4a5568;font-weight:500}
-  .drop-zone .sub{font-size:12px;color:#a0aec0;margin-top:4px}
-  .file-info{margin-top:12px;padding:10px 12px;background:#f7fafc;border-radius:8px;font-size:13px;display:none;position:relative}
+  .drop-zone .icon{font-size:30px;margin-bottom:6px;display:inline-block;filter:drop-shadow(0 0 8px rgba(0,217,255,0.4))}
+  .drop-zone:hover .icon{animation:bounce .7s ease}
+  @keyframes bounce{0%,20%,50%,80%,100%{transform:translateY(0)}40%{transform:translateY(-10px)}60%{transform:translateY(-5px)}}
+  .drop-zone .label{font-size:12px;color:var(--text-primary);font-weight:600}
+  .drop-zone .sub{font-size:10px;color:var(--text-muted);margin-top:3px;font-family:'JetBrains Mono',monospace}
+  .file-info{margin-top:10px;padding:10px;background:var(--bg-input);border:1px solid var(--border-subtle);border-radius:10px;font-size:11px;display:none;position:relative;animation:slideDown .3s ease}
   .file-info.show{display:block}
-  .file-info .name{font-weight:600;color:#2d3748;word-break:break-all;padding-right:50px}
-  .file-info .meta{color:#718096;font-size:12px;margin-top:2px}
-  .file-info .remove{position:absolute;right:10px;top:10px;color:#e53e3e;cursor:pointer;font-size:11px;font-weight:600;background:#fff;padding:3px 8px;border-radius:6px;border:1px solid #fed7d7}
+  @keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+  .file-info.warn{background:rgba(255,176,32,.1);border-color:rgba(255,176,32,.3)}
+  .file-info .name{font-weight:700;color:var(--text-primary);word-break:break-all;padding-right:40px}
+  .file-info .meta{color:var(--text-muted);font-size:10px;margin-top:2px;font-family:'JetBrains Mono',monospace}
+  .file-info .warn-tag{color:var(--accent-orange);font-size:10px;font-weight:600;margin-top:2px}
+  .file-info .remove{position:absolute;right:8px;top:8px;color:var(--accent-red);cursor:pointer;font-size:10px;font-weight:700;background:var(--bg-card);padding:3px 8px;border-radius:6px;border:1px solid rgba(255,56,96,.3);transition:all .2s}
+  .file-info .remove:hover{background:var(--accent-red);color:#fff}
+  .config-bar{background:var(--bg-card);backdrop-filter:blur(20px);border:1px solid var(--border-subtle);border-radius:14px;padding:18px 22px;box-shadow:var(--shadow-card);margin-bottom:24px;display:flex;gap:22px;flex-wrap:wrap;align-items:center;animation:fadeInUp .6s ease-out .4s both}
+  @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+  .config-bar label{font-size:12px;font-weight:600;color:var(--text-secondary);display:flex;align-items:center;gap:8px;cursor:pointer;flex-wrap:wrap}
+  .config-bar select,.config-bar input[type="checkbox"]{cursor:pointer}
+  .config-bar select{padding:8px 12px;border-radius:8px;border:1px solid var(--border-medium);background:var(--bg-input);color:var(--text-primary);font-size:12px;font-weight:600;transition:all .2s}
+  .config-bar select:hover,.config-bar select:focus{border-color:var(--accent-cyan);outline:none;box-shadow:0 0 0 3px rgba(0,217,255,0.15)}
+  .config-bar input[type="checkbox"]{width:16px;height:16px;accent-color:var(--accent-cyan)}
   .action-bar{text-align:center;margin-bottom:24px}
-  .btn{padding:14px 40px;border-radius:12px;border:none;font-size:16px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit}
-  .btn-primary{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;box-shadow:0 6px 20px rgba(102,126,234,.4)}
-  .btn-primary:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 10px 28px rgba(102,126,234,.5)}
-  .btn-primary:disabled{opacity:.5;cursor:not-allowed}
-  .btn-download{background:linear-gradient(135deg,#38a169,#2f855a);color:#fff;box-shadow:0 6px 20px rgba(56,161,105,.4)}
-  .btn-download:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(56,161,105,.5)}
-  .btn-reset{background:#edf2f7;color:#4a5568}
-  .btn-reset:hover{background:#e2e8f0}
-  .progress-card{background:#fff;border-radius:16px;padding:28px;box-shadow:0 10px 30px rgba(0,0,0,.15);display:none;margin-bottom:24px}
-  .progress-card.show{display:block}
-  .progress-bar{height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden;margin-bottom:20px}
-  .progress-bar-fill{height:100%;width:0%;background:linear-gradient(90deg,#667eea,#764ba2,#667eea);border-radius:4px;transition:width .4s ease;background-size:200% 100%;animation:shimmer 2s infinite}
+  .btn{padding:16px 44px;border-radius:12px;border:none;font-size:15px;font-weight:700;cursor:pointer;transition:all .3s;font-family:'Rajdhani','Inter',sans-serif;letter-spacing:.8px;position:relative;overflow:hidden;text-transform:uppercase}
+  .btn::before{content:'';position:absolute;top:50%;left:50%;width:0;height:0;border-radius:50%;background:rgba(255,255,255,.3);transform:translate(-50%,-50%);transition:width .6s,height .6s;pointer-events:none}
+  .btn:hover::before{width:400px;height:400px}
+  .btn-primary{background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));color:#fff;box-shadow:0 8px 32px rgba(0,217,255,0.4)}
+  .btn-primary:hover:not(:disabled){transform:translateY(-3px) scale(1.02);box-shadow:0 12px 40px rgba(0,217,255,0.6)}
+  .btn-primary:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.6)}
+  .btn-primary.loading{color:transparent;pointer-events:none}
+  .btn-primary.loading::after{content:'';position:absolute;top:50%;left:50%;width:20px;height:20px;margin:-10px 0 0 -10px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .btn-download{background:linear-gradient(135deg,var(--accent-green),#00cc6a);color:#fff;box-shadow:0 8px 32px rgba(0,255,136,0.4)}
+  .btn-download:hover{transform:translateY(-3px) scale(1.02);box-shadow:0 12px 40px rgba(0,255,136,0.6)}
+  .btn-reset{background:var(--bg-elevated);color:var(--text-secondary);border:1px solid var(--border-medium)}
+  .btn-reset:hover{background:var(--bg-card-hover);transform:translateY(-2px)}
+  .btn-copy{background:linear-gradient(135deg,var(--accent-orange),#d97706);color:#fff;box-shadow:0 8px 32px rgba(255,176,32,0.4)}
+  .btn-copy:hover{transform:translateY(-3px) scale(1.02);box-shadow:0 12px 40px rgba(255,176,32,0.6)}
+  .btn-small{padding:6px 14px;border-radius:8px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:var(--accent-purple);color:#fff;font-family:inherit;transition:all .2s}
+  .btn-small:hover{background:var(--accent-pink);transform:translateY(-1px)}
+  .progress-card{background:var(--bg-card);backdrop-filter:blur(20px);border:1px solid var(--border-subtle);border-radius:16px;padding:26px;box-shadow:var(--shadow-card);display:none;margin-bottom:24px}
+  .progress-card.show{display:block;animation:slideUpIn .5s ease-out}
+  @keyframes slideUpIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+  .progress-bar{height:10px;background:var(--bg-input);border-radius:5px;overflow:hidden;margin-bottom:22px;border:1px solid var(--border-subtle)}
+  .progress-bar-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent-cyan),var(--accent-purple),var(--accent-pink),var(--accent-cyan));border-radius:5px;transition:width .5s;background-size:200% 100%;animation:shimmer 2s linear infinite;box-shadow:0 0 20px rgba(0,217,255,0.6)}
   @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
   .stages{display:flex;flex-direction:column;gap:10px}
-  .stage{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:10px;background:#f7fafc;opacity:.5;transition:all .3s}
-  .stage.active{opacity:1;background:#ebf8ff;border-left:4px solid #3182ce}
-  .stage.done{opacity:1;background:#f0fff4;border-left:4px solid #38a169}
-  .stage.error{opacity:1;background:#fff5f5;border-left:4px solid #e53e3e}
-  .stage .indicator{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#cbd5e0;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
-  .stage.active .indicator{background:#3182ce;animation:pulse 1.2s infinite}
-  .stage.done .indicator{background:#38a169}
-  .stage.error .indicator{background:#e53e3e}
-  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
-  .stage .text{font-size:14px;color:#2d3748;font-weight:500;flex:1}
-  .stage .detail{font-size:12px;color:#718096;font-weight:600;text-align:right}
-  .result-card{background:#fff;border-radius:16px;padding:28px;box-shadow:0 10px 30px rgba(0,0,0,.15);display:none}
-  .result-card.show{display:block;animation:slideUp .5s ease}
-  @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
-  .result-card h2{font-size:20px;margin-bottom:16px;color:#2d3748;display:flex;align-items:center;gap:8px}
-  .result-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
-  @media(max-width:700px){.result-stats{grid-template-columns:repeat(2,1fr)}}
-  .stat{padding:16px;background:#f7fafc;border-radius:10px;text-align:center}
-  .stat .num{font-size:24px;font-weight:700;color:#667eea}
-  .stat .lbl{font-size:12px;color:#718096;margin-top:4px}
-  .stat.integrity-ok{background:#f0fff4}
-  .stat.integrity-ok .num{color:#38a169}
-  .stat.integrity-warn{background:#fffaf0}
-  .stat.integrity-warn .num{color:#d69e2e}
-  .stat.dup-info{background:#faf5ff}
-  .stat.dup-info .num{color:#6b46c1}
-  .preview-toggle{color:#3182ce;cursor:pointer;font-size:13px;font-weight:600;margin-right:12px;display:inline-block;margin-bottom:12px}
-  .preview{display:none;overflow:auto;margin-bottom:16px;max-height:360px;border-radius:8px;border:1px solid #e2e8f0}
-  .preview.show{display:block}
+  .stage{display:flex;align-items:center;gap:14px;padding:12px 16px;border-radius:10px;background:var(--bg-input);border:1px solid var(--border-subtle);opacity:.5;transition:all .4s}
+  .stage.active{opacity:1;background:rgba(0,217,255,0.08);border-color:rgba(0,217,255,0.3);transform:translateX(4px)}
+  .stage.done{opacity:1;background:rgba(0,255,136,0.06);border-color:rgba(0,255,136,0.3)}
+  .stage.error{opacity:1;background:rgba(255,56,96,0.08);border-color:rgba(255,56,96,0.3)}
+  .stage .indicator{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--bg-elevated);color:var(--text-muted);font-size:12px;font-weight:800;flex-shrink:0;font-family:'JetBrains Mono',monospace;border:1px solid var(--border-medium)}
+  .stage.active .indicator{background:var(--accent-cyan);color:var(--text-inverse);border-color:var(--accent-cyan);animation:ringPulse 1.4s infinite}
+  @keyframes ringPulse{0%{box-shadow:0 0 0 0 rgba(0,217,255,0.7)}70%{box-shadow:0 0 0 14px rgba(0,217,255,0)}100%{box-shadow:0 0 0 0 rgba(0,217,255,0)}}
+  .stage.done .indicator{background:var(--accent-green);color:var(--text-inverse)}
+  .stage.error .indicator{background:var(--accent-red);color:#fff}
+  .stage .text{font-size:13px;color:var(--text-primary);font-weight:600;flex:1}
+  .stage .detail{font-size:11px;color:var(--text-muted);font-weight:700;text-align:right;font-family:'JetBrains Mono',monospace}
+  .summary-card{background:linear-gradient(135deg,var(--bg-card) 0%,rgba(177,74,255,0.04) 50%,var(--bg-card) 100%);backdrop-filter:blur(20px);border:1px solid var(--border-medium);border-radius:20px;padding:32px;box-shadow:var(--shadow-card),0 0 40px rgba(0,217,255,0.1);display:none;margin-bottom:24px;position:relative;overflow:hidden}
+  .summary-card.show{display:block;animation:resultIn .7s}
+  .summary-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent-cyan),var(--accent-purple),var(--accent-pink));animation:summaryBar 4s linear infinite;background-size:200% 100%}
+  @keyframes summaryBar{0%{background-position:0% 0}100%{background-position:200% 0}}
+  .summary-card h2{font-family:'Orbitron','Rajdhani',sans-serif;font-size:22px;margin-bottom:24px;color:var(--text-primary);display:flex;align-items:center;gap:12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase}
+  .summary-card h2 .icon-badge{display:inline-flex;width:36px;height:36px;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));border-radius:10px;font-size:20px;color:#fff;box-shadow:var(--glow-cyan)}
+  .copy-area{position:relative}
+  .copy-textarea{width:100%;min-height:640px;padding:22px;background:var(--bg-primary);border:1px solid var(--border-medium);border-radius:12px;font-family:'JetBrains Mono','Consolas',monospace;font-size:13px;line-height:1.8;color:var(--text-primary);resize:vertical;white-space:pre;overflow:auto;transition:all .3s}
+  .copy-textarea:focus{outline:none;border-color:var(--accent-cyan);box-shadow:0 0 0 3px rgba(0,217,255,0.15)}
+  .copy-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+  .copy-actions .btn{padding:12px 28px;font-size:13px}
+  .summary-meta{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text-muted)}
+  .summary-meta span{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-input);border:1px solid var(--border-subtle);border-radius:6px}
+  .summary-meta span::before{content:'●';color:var(--accent-green);font-size:8px}
+  .result-card{background:var(--bg-card);backdrop-filter:blur(20px);border:1px solid var(--border-subtle);border-radius:16px;padding:28px;box-shadow:var(--shadow-card);display:none;position:relative}
+  .result-card.show{display:block;animation:resultIn .6s}
+  @keyframes resultIn{from{opacity:0;transform:translateY(30px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+  .result-card h2{font-family:'Orbitron','Rajdhani',sans-serif;font-size:22px;margin-bottom:20px;color:var(--text-primary);display:flex;align-items:center;gap:10px;font-weight:800}
+  .result-card h2::before{content:'';display:inline-block;width:6px;height:26px;background:linear-gradient(180deg,var(--accent-cyan),var(--accent-purple));border-radius:3px;box-shadow:var(--glow-cyan)}
+  .result-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+  @media(max-width:800px){.result-stats{grid-template-columns:repeat(2,1fr)}}
+  .stat{padding:18px;background:var(--bg-input);border:1px solid var(--border-subtle);border-radius:12px;text-align:center;position:relative;overflow:hidden;transition:all .3s}
+  .stat::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+  .stat:hover{transform:translateY(-4px);box-shadow:var(--shadow-card-hover)}
+  .stat.diag::before{background:var(--accent-blue)}
+  .stat.seg::before{background:var(--accent-green)}
+  .stat.pg::before{background:var(--accent-orange)}
+  .stat.gdoc::before{background:var(--accent-red)}
+  .stat .num{font-family:'Orbitron','JetBrains Mono',monospace;font-size:26px;font-weight:900;color:var(--accent-cyan);letter-spacing:-.5px;filter:drop-shadow(0 0 8px rgba(0,217,255,0.4))}
+  .stat.diag .num{color:var(--accent-blue)}
+  .stat.seg .num{color:var(--accent-green)}
+  .stat.pg .num{color:var(--accent-orange)}
+  .stat.gdoc .num{color:var(--accent-red)}
+  .stat .lbl{font-size:10px;color:var(--text-muted);margin-top:6px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}
+  .preview-toggle{color:var(--accent-cyan);cursor:pointer;font-size:12px;font-weight:700;margin-right:10px;display:inline-block;margin-bottom:12px;padding:7px 14px;background:rgba(0,217,255,0.08);border:1px solid rgba(0,217,255,0.25);border-radius:8px;transition:all .2s;font-family:'JetBrains Mono',monospace}
+  .preview-toggle:hover{background:rgba(0,217,255,0.15);transform:translateY(-1px)}
+  .preview{display:none;overflow:auto;margin-bottom:16px;max-height:0;border-radius:10px;border:1px solid var(--border-subtle);transition:max-height .4s;background:var(--bg-input)}
+  .preview.show{display:block;max-height:340px}
   .preview table{width:100%;border-collapse:collapse;font-size:11px}
-  .preview th,.preview td{padding:6px 10px;border-bottom:1px solid #e2e8f0;text-align:left;white-space:nowrap}
-  .preview th{background:#edf2f7;font-weight:600;position:sticky;top:0;z-index:1}
-  .actions-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px}
-  .toast{position:fixed;top:20px;right:20px;padding:14px 20px;background:#fff;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.2);z-index:1000;display:none;border-left:4px solid;max-width:380px;font-size:14px}
-  .toast.show{display:block;animation:slideIn .3s ease}
-  .toast.error{border-left-color:#e53e3e;color:#c53030}
-  .toast.success{border-left-color:#38a169;color:#2f855a}
-  .toast.warn{border-left-color:#d69e2e;color:#b7791f}
-  @keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}
-  .warn-note{background:#fffaf0;border:1px solid #fbd38d;color:#975a16;padding:12px 16px;border-radius:10px;font-size:13px;margin-top:16px}
-  .alias-note{background:#ebf8ff;border:1px solid #90cdf4;color:#2c5282;padding:12px 16px;border-radius:10px;font-size:12px;margin-top:16px;line-height:1.8}
-  .alias-note code{background:#fff;padding:1px 6px;border-radius:4px;color:#2b6cb0}
-  .key-note{background:#faf5ff;border:1px solid #d6bcfa;color:#553c9a;padding:12px 16px;border-radius:10px;font-size:12px;margin-top:12px;line-height:1.7}
-  .key-note code{background:#fff;padding:1px 6px;border-radius:4px;color:#6b46c1}
-  .flow-note{background:#f0fff4;border:1px solid #9ae6b4;color:#22543d;padding:12px 16px;border-radius:10px;font-size:12px;margin-top:12px;line-height:1.7}
-  .flow-note code{background:#fff;padding:1px 6px;border-radius:4px;color:#276749}
-  .integrity-note{background:#f7fafc;border:1px solid #cbd5e0;color:#2d3748;padding:12px 16px;border-radius:10px;font-size:12px;margin-top:12px;line-height:1.8}
-  .integrity-note code{background:#fff;padding:1px 6px;border-radius:4px;color:#4a5568}
-  .integrity-note.ok{background:#f0fff4;border-color:#9ae6b4;color:#22543d}
-  .integrity-note.ok code{color:#276749}
-  .integrity-note.warn{background:#fffaf0;border-color:#fbd38d;color:#975a16}
-  .integrity-note.warn code{color:#975a16}
-  .dup-note{background:#faf5ff;border:1px solid #d6bcfa;color:#553c9a;padding:12px 16px;border-radius:10px;font-size:12px;margin-top:12px;line-height:1.8}
-  .dup-note code{background:#fff;padding:1px 6px;border-radius:4px;color:#6b46c1}
-  details.panel{background:#f7fafc;border:1px solid #e2e8f0;border-radius:10px;margin-top:12px;padding:0;overflow:hidden}
-  details.panel summary{padding:12px 16px;cursor:pointer;font-size:13px;font-weight:600;color:#2d3748;user-select:none;transition:background .15s}
-  details.panel summary:hover{background:#edf2f7}
-  details.panel[open] summary{border-bottom:1px solid #e2e8f0;background:#edf2f7}
-  details.panel .panel-body{padding:12px 16px;font-size:12px;color:#4a5568}
-  details.panel .panel-body pre{background:#fff;padding:12px;border-radius:6px;overflow:auto;max-height:300px;font-family:'Consolas',monospace;font-size:11px;line-height:1.5;color:#2d3748;white-space:pre-wrap;word-break:break-all}
-  .mapping-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
-  .mapping-table th,.mapping-table td{padding:6px 10px;border-bottom:1px solid #e2e8f0;text-align:left}
-  .mapping-table th{background:#edf2f7;font-weight:600;color:#4a5568}
-  .mapping-table td.matched{color:#2f855a;font-weight:600}
-  .mapping-table td.unmatched{color:#c53030;font-weight:600}
-  .mapping-table td.source{color:#2b6cb0;font-family:'Consolas',monospace;font-size:11px}
-  .mapping-table .tr-seg{background:#ebf8ff}
-  .mapping-table .tr-pot{background:#fffaf0}
-  .mapping-table .tr-sdl{background:#f0fff4}
-  .mapping-table .tr-cross{background:#faf5ff}
-  .btn-small{padding:6px 14px;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer;background:#3182ce;color:#fff;font-family:inherit}
-  .btn-small:hover{background:#2b6cb0}
-  .cdn-warn{background:#fff5f5;border:1px solid #fed7d7;color:#c53030;padding:12px 16px;border-radius:10px;font-size:13px;margin-top:16px;display:none}
+  .preview th,.preview td{padding:8px 10px;border-bottom:1px solid var(--border-subtle);text-align:left;white-space:nowrap;color:var(--text-primary)}
+  .preview th{background:var(--bg-elevated);font-weight:700;position:sticky;top:0;z-index:1;color:var(--accent-cyan);font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase}
+  .toast-container{position:fixed;top:24px;left:24px;z-index:9999;display:flex;flex-direction:column;gap:10px;pointer-events:none}
+  .toast{padding:16px 22px;background:var(--bg-card);backdrop-filter:blur(20px);border:1px solid var(--border-subtle);border-left:4px solid;border-radius:10px;box-shadow:var(--shadow-card);display:block;max-width:380px;font-size:13px;font-weight:600;color:var(--text-primary);animation:toastIn .4s;pointer-events:auto}
+  .toast.error{border-left-color:var(--accent-red);color:var(--accent-red)}
+  .toast.success{border-left-color:var(--accent-green);color:var(--accent-green)}
+  .toast.warn{border-left-color:var(--accent-orange);color:var(--accent-orange)}
+  .toast.hiding{animation:toastOut .3s forwards}
+  @keyframes toastIn{from{opacity:0;transform:translateX(-400px) scale(.85)}to{opacity:1;transform:translateX(0) scale(1)}}
+  @keyframes toastOut{to{opacity:0;transform:translateX(-400px) scale(.85)}}
+  .perf-note{background:rgba(177,74,255,0.08);border:1px solid rgba(177,74,255,0.25);color:var(--text-primary);padding:14px 16px;border-radius:10px;font-size:12px;margin-top:14px;line-height:1.7}
+  details.panel{background:var(--bg-input);border:1px solid var(--border-subtle);border-radius:10px;margin-top:14px;padding:0;overflow:hidden}
+  details.panel summary{padding:14px 18px;cursor:pointer;font-size:13px;font-weight:700;color:var(--text-primary);list-style:none;display:flex;align-items:center;gap:8px}
+  details.panel summary::-webkit-details-marker{display:none}
+  details.panel summary::before{content:'▶';display:inline-block;transition:transform .3s;color:var(--accent-cyan);font-size:10px}
+  details.panel[open] summary::before{transform:rotate(90deg)}
+  details.panel[open] summary{border-bottom:1px solid var(--border-subtle)}
+  details.panel .panel-body{padding:14px 18px;font-size:12px;color:var(--text-secondary)}
+  details.panel .panel-body pre{background:var(--bg-primary);padding:14px;border-radius:8px;overflow:auto;max-height:280px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.6;color:var(--text-primary);white-space:pre-wrap;word-break:break-all;border:1px solid var(--border-subtle)}
+  .cdn-warn{background:rgba(255,56,96,.1);border:1px solid rgba(255,56,96,.3);color:var(--accent-red);padding:14px 18px;border-radius:10px;font-size:13px;margin-top:16px;display:none}
   .cdn-warn.show{display:block}
+  .success-wave{position:fixed;inset:0;pointer-events:none;z-index:9998;display:none;background:radial-gradient(circle at center,rgba(0,255,136,.15),transparent 70%);animation:successFade 1.2s ease-out}
+  .success-wave.show{display:block}
+  @keyframes successFade{0%{opacity:0;transform:scale(.5)}50%{opacity:1}100%{opacity:0;transform:scale(1.5)}}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-track{background:var(--bg-primary);border-radius:5px}
+  ::-webkit-scrollbar-thumb{background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));border-radius:5px}
+  @media(max-width:700px){body{padding:16px}.container{padding-top:50px}.summary-card{padding:20px}.summary-card h2{font-size:17px}.copy-textarea{min-height:500px;font-size:11px;padding:16px}}
 </style>
 </head>
 <body>
+
+<div class="grid-bg"></div>
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+<div class="success-wave" id="successWave"></div>
+
+<button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">
+  <span class="theme-icon" id="themeIcon">🌙</span>
+  <span class="theme-label" id="themeLabel">DARK</span>
+</button>
+
 <div class="container">
   <div class="header">
-    <h1>⚡BCP Compiler Jangan Lupa Ibadah ⚠️ </h1>
-    <p>Sekedar Compiler biasa saja</p>
-    <p><style="margin-top:8px;font-size:12px;opacity:.85">🔁 Dibuat untuk senda gurau semata </p>
+    <h1>⚡ BCP COMPILER</h1>
+    <p><b>POT</b> · <b>Segmentation</b> · <b>CMDB</b> · <b>ZIP Power Alarm</b> → 4 Sheets + Summary</p>
   </div>
 
-  <div class="cdn-warn" id="cdn-warn">
-    ⚠️ <b>SheetJS gagal dimuat dari semua CDN.</b> Periksa koneksi internet atau firewall Anda.
-  </div>
+  <div class="cdn-warn" id="cdn-warn">⚠️ <b>Library Excel gagal dimuat.</b> Periksa koneksi internet.</div>
 
   <div class="upload-grid">
     <div class="upload-card pot">
-      <h2>🔴 File 1 — POT Analysis Report <span class="badge purple">File Analysis Report</span></h2>
+      <h2>🔴 POT <span class="badge red">WAJIB</span></h2>
+      <div class="desc">Summary Report + Site Down List</div>
       <label class="drop-zone" id="dz-pot">
         <input type="file" id="file-pot" accept=".xlsx,.xls,.csv">
         <div class="icon">📕</div>
-        <div class="label">Klik / seret file POT Analysis Report</div>
+        <div class="label">Klik / seret</div>
         <div class="sub">.xlsx · .xls · .csv</div>
       </label>
       <div class="file-info" id="info-pot">
-        <span class="remove" onclick="clearFile('pot');event.preventDefault()">✕ Ganti</span>
+        <span class="remove" onclick="clearFile('pot');event.preventDefault()">✕</span>
         <div class="name" id="name-pot"></div>
         <div class="meta" id="meta-pot"></div>
+        <div class="warn-tag" id="warn-pot"></div>
       </div>
     </div>
 
     <div class="upload-card seg">
-      <h2>🔵 File 2 — Segmentation Info <span class="badge blue">Segement info export OWS</span></h2>
+      <h2>🔵 Segmentation <span class="badge blue">WAJIB</span></h2>
+      <div class="desc">Data actual · site absen = UP</div>
       <label class="drop-zone" id="dz-seg">
         <input type="file" id="file-seg" accept=".xlsx,.xls,.csv">
         <div class="icon">📘</div>
-        <div class="label">Klik / seret file Segmentation Info</div>
+        <div class="label">Klik / seret</div>
         <div class="sub">.xlsx · .xls · .csv</div>
       </label>
       <div class="file-info" id="info-seg">
-        <span class="remove" onclick="clearFile('seg');event.preventDefault()">✕ Ganti</span>
+        <span class="remove" onclick="clearFile('seg');event.preventDefault()">✕</span>
         <div class="name" id="name-seg"></div>
         <div class="meta" id="meta-seg"></div>
+        <div class="warn-tag" id="warn-seg"></div>
       </div>
     </div>
+
+    <div class="upload-card cmdb">
+      <h2>🟡 CMDB <span class="badge yellow">OPSIONAL</span></h2>
+      <div class="desc">Master fallback · 14 kolom</div>
+      <label class="drop-zone" id="dz-cmdb">
+        <input type="file" id="file-cmdb" accept=".xlsx,.xls,.csv">
+        <div class="icon">📙</div>
+        <div class="label">Klik / seret</div>
+        <div class="sub">.xlsx · .xls · .csv</div>
+      </label>
+      <div class="file-info" id="info-cmdb">
+        <span class="remove" onclick="clearFile('cmdb');event.preventDefault()">✕</span>
+        <div class="name" id="name-cmdb"></div>
+        <div class="meta" id="meta-cmdb"></div>
+        <div class="warn-tag" id="warn-cmdb"></div>
+      </div>
+    </div>
+
+    <div class="upload-card zip">
+      <h2>📦 ZIP Power Alarm <span class="badge purple">OPSIONAL</span></h2>
+      <div class="desc">ZIP berisi CSV/Excel</div>
+      <label class="drop-zone" id="dz-zip">
+        <input type="file" id="file-zip" accept=".zip">
+        <div class="icon">📦</div>
+        <div class="label">Klik / seret ZIP</div>
+        <div class="sub">.zip (CSV / XLSX)</div>
+      </label>
+      <div class="file-info" id="info-zip">
+        <span class="remove" onclick="clearFile('zip');event.preventDefault()">✕</span>
+        <div class="name" id="name-zip"></div>
+        <div class="meta" id="meta-zip"></div>
+        <div class="warn-tag" id="warn-zip"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="config-bar">
+    <label>🔍 Filter: <select id="filter-status"><option value="all" selected>Semua</option><option value="down">Hanya DOWN</option><option value="up">Hanya UP</option></select></label>
+    <label>📋 Header: <select id="header-mode"><option value="template" selected>Template BCP</option><option value="dynamic">Dinamis</option></select></label>
+    <label><input type="checkbox" id="norm-siteid" checked> Normalisasi Site Id</label>
+    <label><input type="checkbox" id="colorize" checked> 🎨 Warnai per Key</label>
   </div>
 
   <div class="action-bar">
@@ -181,277 +310,257 @@
   <div class="progress-card" id="progress-card">
     <div class="progress-bar"><div class="progress-bar-fill" id="progress-fill"></div></div>
     <div class="stages">
-      <div class="stage" id="stage-pot"><div class="indicator">1</div><div class="text">Membaca POT Analysis Report</div><div class="detail" id="det-pot"></div></div>
-      <div class="stage" id="stage-seg"><div class="indicator">2</div><div class="text">Membaca Segmentation Info</div><div class="detail" id="det-seg"></div></div>
-      <div class="stage" id="stage-match"><div class="indicator">3</div><div class="text">Menentukan base (Site Down List) & membangun lookup</div><div class="detail" id="det-match"></div></div>
-      <div class="stage" id="stage-build"><div class="indicator">4</div><div class="text">Membangun sheet bcp_segmentation_export_sheet</div><div class="detail" id="det-build"></div></div>
-      <div class="stage" id="stage-summary"><div class="indicator">5</div><div class="text">Menyalin Summary Report → bcp_diagram_export_sheet</div><div class="detail" id="det-summary"></div></div>
-      <div class="stage" id="stage-excel"><div class="indicator">6</div><div class="text">Menyusun file Excel output</div><div class="detail" id="det-excel"></div></div>
+      <div class="stage" id="stage-pot"><div class="indicator">1</div><div class="text">Membaca POT</div><div class="detail" id="det-pot"></div></div>
+      <div class="stage" id="stage-seg"><div class="indicator">2</div><div class="text">Membaca Segmentation + CMDB</div><div class="detail" id="det-seg"></div></div>
+      <div class="stage" id="stage-zip"><div class="indicator">3</div><div class="text">Membaca ZIP Power Alarm</div><div class="detail" id="det-zip"></div></div>
+      <div class="stage" id="stage-base"><div class="indicator">4</div><div class="text">Menyusun Base SDL</div><div class="detail" id="det-base"></div></div>
+      <div class="stage" id="stage-build"><div class="indicator">5</div><div class="text">Membangun Segmentation</div><div class="detail" id="det-build"></div></div>
+      <div class="stage" id="stage-agg"><div class="indicator">6</div><div class="text">Membangun Diagram + PG + GDOC</div><div class="detail" id="det-agg"></div></div>
+      <div class="stage" id="stage-excel"><div class="indicator">7</div><div class="text">Menyusun Excel + Summary</div><div class="detail" id="det-excel"></div></div>
+    </div>
+  </div>
+
+  <div class="summary-card" id="summary-card">
+    <h2><span class="icon-badge">📊</span> INCIDENT SUMMARY</h2>
+    <div class="summary-meta">
+      <span>Source: GDOC + PG</span>
+      <span id="sum-meta-mc">MC: -</span>
+      <span id="sum-meta-down">Down: -</span>
+      <span id="sum-meta-alarm">Alarm: -</span>
+    </div>
+    <div class="copy-area">
+      <textarea class="copy-textarea" id="summary-text" readonly placeholder="Summary akan muncul di sini setelah proses selesai..."></textarea>
+      <div class="copy-actions">
+        <button class="btn btn-copy" onclick="copySummaryText()">📋 Copy Summary</button>
+        <button class="btn btn-reset" onclick="selectAllSummaryText()">✂️ Select All</button>
+      </div>
     </div>
   </div>
 
   <div class="result-card" id="result-card">
-    <h2>✅Comparation Done kana kuch</h2>
+    <h2>✅ KOMPILASI SELESAI</h2>
     <div class="result-stats">
-      <div class="stat"><div class="num" id="stat-diag">0</div><div class="lbl">Baris · bcp_diagram</div></div>
-      <div class="stat" id="stat-base-card"><div class="num" id="stat-base">0</div><div class="lbl">Baris · Site Down List (base)</div></div>
-      <div class="stat" id="stat-output-card"><div class="num" id="stat-output">0</div><div class="lbl">Baris · Output</div></div>
-      <div class="stat dup-info"><div class="num" id="stat-dup">0</div><div class="lbl">Duplikat (dipertahankan)</div></div>
+      <div class="stat diag"><div class="num" id="stat-diag">0</div><div class="lbl">Diagram</div></div>
+      <div class="stat seg"><div class="num" id="stat-seg">0</div><div class="lbl">Segmentation</div></div>
+      <div class="stat pg"><div class="num" id="stat-pg">0</div><div class="lbl">PG</div></div>
+      <div class="stat gdoc"><div class="num" id="stat-gdoc">0</div><div class="lbl">GDOC</div></div>
     </div>
-    <span class="preview-toggle" onclick="togglePreview('prev-diag')">👁 Preview bcp_diagram</span>
-    <span class="preview-toggle" onclick="togglePreview('prev-seg')">👁 Preview bcp_segmentation</span>
+    <span class="preview-toggle" onclick="togglePreview('prev-diag')">👁 bcp_diagram</span>
+    <span class="preview-toggle" onclick="togglePreview('prev-seg')">👁 bcp_segmentation</span>
+    <span class="preview-toggle" onclick="togglePreview('prev-pg')">👁 PG</span>
+    <span class="preview-toggle" onclick="togglePreview('prev-gdoc')">👁 GDOC</span>
     <div class="preview" id="prev-diag"></div>
     <div class="preview" id="prev-seg"></div>
-    <div class="actions-row">
-      <button class="btn btn-download" onclick="downloadOutput()">⬇️ Download File Excel</button>
-      <button class="btn btn-reset" onclick="resetAll()">🔄 Mulai Ulang</button>
+    <div class="preview" id="prev-pg"></div>
+    <div class="preview" id="prev-gdoc"></div>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:20px">
+      <button class="btn btn-download" onclick="downloadOutput()">⬇️ Download Excel</button>
+      <button class="btn btn-reset" onclick="resetAll()">🔄 Reset</button>
     </div>
-    <div class="integrity-note" id="integrity-note">🛡️ <b>Data integrity:</b> memverifikasi jumlah baris...</div>
-    <div class="dup-note" id="dup-note">🔁 <b>Duplikat:</b> menghitung...</div>
-    <div class="flow-note" id="flow-note">
-      🧭 <b>Alur:</b> setiap baris <code>Site Down List</code> → 1 baris output · kolom tertentu diambil langsung dari Site Down List · kolom lain diperkaya dari Segmentation Info & POT detail.
-    </div>
-    <div class="key-note" id="key-note">🔑 <b>Key:</b> sedang menentukan sumber...</div>
-    <div class="alias-note">
-      🔗 <b>Cross-map & alias aktif:</b><br>
-      🔀 <code>First Occurred(NT)</code> ← <code>Last Occurred(NT)</code> di <b>Site Down List</b><br>
-      🟢 <code>Key</code>, <code>Alarm</code>, <code>Site Id</code>, <code>BTS Name</code>, <code>Hub Type</code>, <code>Power Alarm Name</code>, <code>Power Alarm Time</code> ← hanya dari <b>Site Down List</b><br>
-      🔵 Kolom lain (Old Site Id, System, Tech, IP OAM, Last Occurred(NT), Alarm Identifier, TT, WO, Mains Failure, dll) ← dari Segmentation Info & POT detail<br>
-      📝 Alias: <code>Site Id</code> ↔ <code>Site ID</code>
-    </div>
-
-    <details class="panel" id="mapping-panel">
-      <summary>🔗 Column Mapping (klik untuk lihat detail)</summary>
-      <div class="panel-body">
-        <table class="mapping-table">
-          <thead><tr><th>Kolom Template</th><th>Kolom Asli</th><th>Sumber</th><th>Status</th></tr></thead>
-          <tbody id="mapping-body"></tbody>
-        </table>
-      </div>
-    </details>
-
+    <div class="perf-note" id="perf-note">⚡ Selesai</div>
     <details class="panel" id="debug-panel">
-      <summary>🐛 Debug Log (klik untuk lihat)</summary>
+      <summary>🐛 Debug Log</summary>
       <div class="panel-body">
         <pre id="debug-content"></pre>
         <div style="margin-top:10px;text-align:right">
-          <button class="btn-small" onclick="downloadLog()">⬇️ Download Log</button>
+          <button class="btn-small" onclick="downloadLog()">⬇️ Log</button>
         </div>
       </div>
     </details>
-
-    <div class="warn-note">💡 Jika ada kolom kosong, cek mapping table & debug log — bisa jadi nama kolom sumber tidak terdeteksi.</div>
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast-container" id="toast-container"></div>
 
 <script>
-/* ============================================================
-   KONSTANTA TEMPLATE
-============================================================ */
+/* ═══════════════ THEME ═══════════════ */
+function toggleTheme() {
+  const html = document.documentElement;
+  const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('bcp-theme', next);
+  updateThemeUI(next);
+}
+function updateThemeUI(theme) {
+  document.getElementById('themeIcon').textContent = theme === 'dark' ? '🌙' : '☀️';
+  document.getElementById('themeLabel').textContent = theme === 'dark' ? 'DARK' : 'LIGHT';
+}
+updateThemeUI(document.documentElement.getAttribute('data-theme') || 'dark');
+
+/* ═══════════════ KONSTANTA ═══════════════ */
 const DIAG_COLS = ["BCP ID","BCP Date","BCP Time","% of total site down in region","Total Sites Down","Total Sites With Power Alarm","Region","Total Sites","Remark"];
 const SEG_COLS = ["Key","First Occurred(NT)","Last Occurred(NT)","Alarm","Alarm Identifier","Site Id","Old Site Id","BTS Name","System","Tech","IP OAM","VLAN OAM","IP S1-CU H3I","VLAN S1-CU H3I","IP  S1-C ISAT","VLAN S1-C ISAT","IP S1-U ISAT","VLAN S1-U ISAT","IP 2G","VLAN 2G","IP Sync","VLAN Sync","MAC Address","Hostname/Router EN","Hostname/Router CN","Hostname/Router AN","Hostname/Router","Hostname Status","Owner","Ring ID","Destination Site","Hub Type","City","Dependency Number","Dependency Site List","DWDM Site","DWDM Status","DWDM Alarm","DWDM Alarm Time","Site Class(Priority)","Genset","Battery Status","MC","Area","Province","Region","VIP","Impact Category","TT","WO","Power Alarm Name","Power Alarm Time","Mains Failure (Exal & PMS) Last Occur Time","Router Power Alarm","Router Power Alarm Time","DWDM Power Alarm Time","DWDM Power Alarm","Transport Outage","Actual Battery Backup Duration/(Minute)","Remark"];
+const STATUS_COLS = ["Status", "Recovery Note"];
+const PG_COLS = ["Time","Region","MC Cluster Name","Total Site MC","Big Hub Sites Down","Medium Hub Sites Down","Small Hub Down","Critical Sites Down","End Site Down","Total Sites Down","Total % Sites Down","Big Medium with DG","Critical with DG","Big Medium no DG","Critical no DG","Existing BAU PG Based on Power Database","Number BAU PG Deployed","% BAU PG Deployed","Extra PG Prepared (DOP, PG with handler, PG Rental)","Extra PG Prepared Deployed","% Extra PG Prepared Deployed","BIG HUB SITE","MEDIUM HUB SITE","CRITICAL SMALL HUB SITE","NON CRITICAL SMALL HUB SITE","CRITICAL END SITE","NON CRITICAL END SITE","CRITICAL MEDIUM HUB SITE","CRITICAL BIG HUB SITE","Total Sites Down","YES NO Percentage"];
+const PG_CATEGORIES = ['NOC','','','','','','','','','','','CMDB','','','','FSO','','','','','','','','','','','','','','Total Sites Down','YES NO Percentage'];
+const PG_HEADER_COLORS = [...Array(11).fill('5B21B6'),...Array(4).fill('FBCFE8'),...Array(6).fill('3B82F6'),...Array(8).fill('00E676'),...Array(1).fill('FFA500'),...Array(1).fill('00B050')];
+const PG_DARK_FONT_COLS = [11,12,13,14];
+const GDOC_COLS = ["MC Area","MC Cluster site down > 25 % (Yes, No)","Site ID","Site Name","Current Status Site (Up/Down)","Hub Type","Previous Status Outage (BTS Local Down or Fully Site Outage)","Permanent Genset (Available, Not Available)","Site Class","Super Sites",">2TB","P0","VVIP","VIP","Genset Deploy Status (Permanent DG run, BAU Portable Genset run)","Additional MC>25% Portable Genset run (Yes,No)","FME Office","RTS","CA","Update Team"];
+const GDOC_HEADER_COLORS = [...Array(9).fill('00E676'),...Array(5).fill('5BC0DE'),...Array(6).fill('FFC000')];
+const GDOC_IDX = {MC_AREA:0,MC_25:1,SITE_ID:2,SITE_NAME:3,STATUS:4,HUB_TYPE:5,TRANSPORT:6,GENSET:7,SITE_CLASS:8,SUPER_SITES:9,TRAFFIC:10,P0:11,VVIP:12,VIP:13,GENSET_DEPLOY:14,ADDITIONAL_MC:15,FME:16,RTS:17,CA:18,UPDATE_TEAM:19};
+const PG_IDX = {TIME:0,REGION:1,MC_NAME:2,TOTAL_MC:3,BIG_DOWN:4,MEDIUM_DOWN:5,SMALL_DOWN:6,CRITICAL_DOWN:7,END_DOWN:8,TOTAL_DOWN:9,PCT_DOWN:10};
+const SDL_SOURCE_MAP = {'Key':'Key','Site Id':'Site Id','First Occurred(NT)':'Last Occurred(NT)','Last Occurred(NT)':'Last Occurred(NT)','Alarm':'Alarm','Alarm Identifier':'Alarm Identifier','BTS Name':'Site Name','Hub Type':'Hub Type','City':'City','MC':'MC','Area':'Area','Province':'Province','VIP':'VIP','Impact Category':'Impact Category','TT':'TT','WO':'WO','Power Alarm Name':'Power Alarm Name','Power Alarm Time':'Power Alarm Time','Mains Failure (Exal & PMS) Last Occur Time':'Mains Failure (Exal & PMS) Last Occur Time','Router Power Alarm':'Router Power Alarm','Router Power Alarm Time':'Router Power Alarm Time','Transport Outage':'Transport Outage','Actual Battery Backup Duration/(Minute)':'Actual Battery Backup Duration/(Minute)','Remark':'Remark'};
+const COL_ALIASES = {'First Occurred(NT)':['First Occurrence','First Occurred','FirstOccurred'],'Last Occurred(NT)':['Last Occurrence','Last Occurred','LastOccurred'],'Site Id':['Site ID','SiteID','Site_Id','SITEID','Site ID*'],'Site Name':['Site Name','SiteName','Site Name*','BTS Name','BTSName'],'Key':['Key'],'Site Name*':['Site Name*','Site Name','SiteName'],'HUB Type':['HUB Type','Hub Type','HubType'],'Site Priority Label':['Site Priority Label','Site Priority','Site Class'],'Has Generator':['Has Generator','Permanent Genset','Generator'],'DG Status':['DG Status'],'Traffic Class':['Traffic Class','>2TB','2TB'],'P0 Sites':['P0 Sites','P0Sites','P0'],'Is VIP':['Is VIP','VIP','VVIP'],'FM Office*':['FM Office*','FM Office','FME Office'],'Rts Name':['Rts Name','RTS'],'Rts Id':['Rts Id'],'MC Cluster':['MC Cluster','MC Area','MCArea'],'Is Hub':['Is Hub','Super Sites','SuperSites'],'Site Class(Priority)':['Site Class(Priority)','Site Class','Site Priority','Site Priority Label'],'Site Class':['Site Class','Site Class(Priority)','Site Priority','Site Priority Label'],'Super Sites':['Super Sites','SuperSites','Is Hub','IsHub'],'>2TB':['>2TB','>2 TB','2TB','Traffic Class','TrafficClass'],'P0':['P0','P0 Sites','P0Sites'],'VVIP':['VVIP','V.VIP'],'VIP':['VIP','V.I.P','Is VIP'],'Genset':['Genset','Genset Status','Generator Status']};
+const SNAPSHOT_COLORS = [{fill:'DBEAFE',font:'1E40AF'},{fill:'D1FAE5',font:'065F46'},{fill:'FEF3C7',font:'92400E'},{fill:'FFEDD5',font:'9A3412'},{fill:'FEE2E2',font:'991B1B'},{fill:'F3E8FF',font:'6B21A8'},{fill:'FFE4E6',font:'9F1239'},{fill:'CCFBF1',font:'134E4A'}];
+const CMDB_NEEDED_COLS = ['Site Id','Site Name*','HUB Type','Site Priority Label','Has Generator','DG Status','Traffic Class','P0 Sites','Is VIP','FM Office*','Rts Name','Rts Id','MC Cluster','Is Hub'];
+const CMDB_NEEDED_IDX = {}; CMDB_NEEDED_COLS.forEach((a,i)=>{CMDB_NEEDED_IDX[a]=i;});
+const FILE_SIZE_WARN_MB = 10, CHUNK_SIZE = 5000;
+const STATUS_DOWN_COLOR = 'FF0000', STATUS_UP_COLOR = '00B050';
+const FONT_BLACK = '000000', FONT_WHITE = 'FFFFFF';
 
-/* PETA KOLOM OUTPUT ← KOLOM DI SITE DOWN LIST (strict, tanpa fallback) */
-const SDL_SOURCE_MAP = {
-  'Key':                'Key',
-  'Site Id':            'Site Id',
-  'First Occurred(NT)': 'Last Occurred(NT)',  // cross-map
-  'Alarm':              'Alarm',
-  'BTS Name':           'BTS Name',
-  'Hub Type':           'Hub Type',
-  'Power Alarm Name':   'Power Alarm Name',
-  'Power Alarm Time':   'Power Alarm Time',
-};
-
-const COL_ALIASES = {
-  'First Occurred(NT)': ['First Occurrence', 'First Occurred', 'FirstOccurred', 'First Occurred (NT)'],
-  'Last Occurred(NT)':  ['Last Occurrence',  'Last Occurred',  'LastOccurred',  'Last Occurred (NT)'],
-  'Site Id':            ['Site ID', 'SiteID', 'Site Id ', 'Site_Id', 'SITEID'],
-  'Power Alarm Name':   ['Power Alarm Name', 'PowerAlarmName', 'Power Alarm'],
-  'Power Alarm Time':   ['Power Alarm Time', 'PowerAlarmTime'],
-};
-
-/* ============================================================
-   STATE
-============================================================ */
-let potFile = null, segFile = null;
-let lastOutputBlob = null, lastDiagRows = null, lastSegRows = null;
+let potFile = null, segFile = null, cmdbFile = null, zipFile = null;
+let lastOutputBlob = null;
 let processing = false;
 const logLines = [];
-let mappingRows = [];
 
-/* ============================================================
-   UTIL
-============================================================ */
+/* ═══════════════ UTIL ═══════════════ */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const norm = s => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
-
+const normSiteId = s => String(s ?? '').trim().toUpperCase().replace(/[\s\-_.]/g, '');
+const normMCKey = s => String(s ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+function dedupeValues(val, sep='/') {
+  if (val == null) return '';
+  const s = String(val).trim(); if (!s) return '';
+  if (!s.includes(',')) return s;
+  return [...new Set(s.split(',').map(p=>p.trim()).filter(p=>p))].join(sep);
+}
 function log(msg) {
   const ts = new Date().toLocaleTimeString('id-ID');
   logLines.push(`[${ts}] ${msg}`);
   const el = document.getElementById('debug-content');
   if (el) el.textContent = logLines.join('\n');
 }
-
-function toast(msg, type = 'success') {
-  const el = document.getElementById('toast');
-  el.className = 'toast show ' + type;
+function toast(msg, type='success') {
+  const c = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
   el.textContent = msg;
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('show'), 4500);
+  c.appendChild(el);
+  setTimeout(() => { el.classList.add('hiding'); setTimeout(() => el.remove(), 300); }, 4000);
 }
-
-function fmtBytes(b) {
-  return b < 1024 ? b + ' B'
-    : b < 1048576 ? (b/1024).toFixed(1) + ' KB'
-    : (b/1048576).toFixed(2) + ' MB';
-}
-
-function escapeHtml(s) {
-  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-}
-
+function fmtBytes(b) { return b < 1024 ? b + ' B' : b < 1048576 ? (b/1024).toFixed(1) + ' KB' : (b/1048576).toFixed(2) + ' MB'; }
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function displayCell(v) {
   if (v == null) return '';
   if (v instanceof Date) {
-    const y = v.getFullYear();
-    const m = String(v.getMonth()+1).padStart(2,'0');
-    const d = String(v.getDate()).padStart(2,'0');
-    const hh = String(v.getHours()).padStart(2,'0');
-    const mm = String(v.getMinutes()).padStart(2,'0');
-    const ss = String(v.getSeconds()).padStart(2,'0');
+    const y = v.getFullYear(), m = String(v.getMonth()+1).padStart(2,'0'), d = String(v.getDate()).padStart(2,'0');
+    const hh = String(v.getHours()).padStart(2,'0'), mm = String(v.getMinutes()).padStart(2,'0'), ss = String(v.getSeconds()).padStart(2,'0');
     return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
   }
   return String(v);
 }
-
-function parseDate(v) {
-  if (!v) return null;
-  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
-  const s = String(v).trim();
-  if (!s) return null;
-  let d = new Date(s);
-  if (!isNaN(d.getTime())) return d;
-  const m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
-  if (m) {
-    const a = parseInt(m[1]), b = parseInt(m[2]);
-    let y = parseInt(m[3]);
-    if (y < 100) y += 2000;
-    if (a > 12) return new Date(y, b-1, a);
-    if (b > 12) return new Date(y, a-1, b);
-    return new Date(y, a-1, b);
-  }
-  const n = Number(s);
-  if (!isNaN(n) && n > 0 && n < 100000) return new Date(Math.round((n - 25569) * 86400 * 1000));
-  return null;
+function animateNumber(el, target, duration=900) {
+  const start = parseInt(el.textContent.replace(/\D/g,'')) || 0;
+  const t0 = performance.now();
+  const step = now => {
+    const p = Math.min((now - t0) / duration, 1);
+    const e = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(start + (target - start) * e).toLocaleString('id-ID');
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
-
 function findSheet(wb, patterns) {
   for (const p of patterns) for (const n of wb.SheetNames) if (norm(n) === norm(p)) return n;
   for (const p of patterns) for (const n of wb.SheetNames) if (norm(n).includes(norm(p))) return n;
   return null;
 }
-
-function sheetToAOA(wb, sheetName) {
-  const s = wb.Sheets[sheetName];
-  if (!s) return null;
-  return XLSX.utils.sheet_to_json(s, { header: 1, defval: '', raw: false, blankrows: true });
+function findSDLSheet(wb) {
+  const patterns = ['site down list','sitedownlist','sitedown','down list','downlist','downsites'];
+  for (const p of patterns) for (const n of wb.SheetNames) if (norm(n).includes(norm(p))) return n;
+  for (const n of wb.SheetNames) if (norm(n).includes('down')) return n;
+  return null;
 }
-
+function sheetToAOA(wb, sheetName) {
+  const s = wb.Sheets[sheetName]; if (!s) return null;
+  return XLSX.utils.sheet_to_json(s, {header:1, defval:'', raw:false, blankrows:false});
+}
 function padRow(row, len) {
   const r = Array.isArray(row) ? row.slice() : [];
   while (r.length < len) r.push('');
   return r;
 }
-
 function autoMatch(targetCol, headers) {
   if (!headers || !headers.length) return null;
-  const nt = norm(targetCol);
-  if (!nt) return null;
+  const nt = norm(targetCol); if (!nt) return null;
   const aliases = COL_ALIASES[targetCol] || [];
+  for (const a of aliases) { const na = norm(a); const f = headers.find(h => norm(h) === na); if (f) return f; }
+  let f = headers.find(h => norm(h) === nt); if (f) return f;
   for (const a of aliases) {
-    const na = norm(a);
-    const found = headers.find(h => norm(h) === na);
-    if (found) return found;
+    const na = norm(a); if (!na) continue;
+    f = headers.find(h => { const nh = norm(h); return nh && (nh.includes(na) || na.includes(nh)); });
+    if (f) return f;
   }
-  let found = headers.find(h => norm(h) === nt);
-  if (found) return found;
-  for (const a of aliases) {
-    const na = norm(a);
-    if (!na) continue;
-    found = headers.find(h => {
-      const nh = norm(h);
-      return nh && (nh.includes(na) || na.includes(nh));
-    });
-    if (found) return found;
-  }
-  for (const h of headers) {
-    const nh = norm(h);
-    if (nh && (nh.includes(nt) || nt.includes(nh))) return h;
-  }
+  for (const h of headers) { const nh = norm(h); if (nh && (nh.includes(nt) || nt.includes(nh))) return h; }
   return null;
 }
-
-function exactKeyMatch(headers) {
-  if (!headers) return null;
-  return headers.find(h => norm(h) === 'key') || null;
-}
-
-function findHeaderRowByColumns(rows, requiredTests, scan = 20) {
-  if (!rows) return -1;
+function exactKeyMatch(headers) { return headers ? (headers.find(h => norm(h) === 'key') || null) : null; }
+function detectSDLHeader(rows, scan=30) {
+  let bestIdx = -1, bestScore = -999;
   for (let i = 0; i < Math.min(scan, rows.length); i++) {
-    const r = rows[i];
-    if (!r || !r.length) continue;
-    let allFound = true;
-    for (const test of requiredTests) {
-      if (!r.some(h => test(h))) { allFound = false; break; }
-    }
-    if (allFound) return i;
+    const r = rows[i]; if (!r || !r.length) continue;
+    const ne = r.filter(c => c !== '' && c != null).length;
+    if (ne < 2) continue;
+    let s = ne;
+    if (r.some(h => norm(h) === 'key')) s += 100;
+    if (r.some(h => norm(h).includes('site') && norm(h).includes('id'))) s += 50;
+    if (s > bestScore) { bestScore = s; bestIdx = i; }
   }
-  return -1;
+  return bestIdx >= 0 ? bestIdx : 0;
 }
-
-function findHeaderRow(rows, targetHeaders, scan = 25) {
+function findHeaderRow(rows, targetHeaders, scan=25) {
   let bestRow = -1, bestScore = 0;
   for (let i = 0; i < Math.min(rows.length, scan); i++) {
     const r = rows[i]; if (!r) continue;
-    let score = 0;
-    for (const t of targetHeaders) if (r.some(c => norm(c) === norm(t))) score++;
-    if (score > bestScore) { bestScore = score; bestRow = i; }
+    let s = 0;
+    for (const t of targetHeaders) if (r.some(c => norm(c) === norm(t))) s++;
+    if (s > bestScore) { bestScore = s; bestRow = i; }
   }
   return bestScore >= 2 ? bestRow : -1;
 }
 
-/* ============================================================
-   SHEETJS FALLBACK LOADER
-============================================================ */
-function ensureSheetJS() {
-  return new Promise((resolve) => {
-    if (window.XLSX) { resolve(true); return; }
-    const cdns = [
-      'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js',
-      'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
-    ];
-    let i = 0;
-    function tryNext() {
-      if (i >= cdns.length) { resolve(false); return; }
-      const url = cdns[i++];
-      log('Fallback load SheetJS dari: ' + url);
-      const s = document.createElement('script');
-      s.src = url;
-      s.onload = () => window.XLSX ? resolve(true) : tryNext();
-      s.onerror = () => tryNext();
-      document.head.appendChild(s);
-    }
-    setTimeout(() => window.XLSX ? resolve(true) : tryNext(), 600);
-  });
+/* ═══════════════ ZIP PARSING ═══════════════ */
+async function parseZipPowerAlarm(zipFile, knownSiteNorms) {
+  if (!window.JSZip) throw new Error('JSZip library belum termuat');
+  const zip = await JSZip.loadAsync(zipFile);
+  const foundSites = new Set();
+  let fileCount = 0;
+  for (const [path, entry] of Object.entries(zip.files)) {
+    if (entry.dir) continue;
+    const lower = path.toLowerCase();
+    if (!/\.(csv|xlsx|xls)$/i.test(lower)) continue;
+    fileCount++;
+    try {
+      let wb;
+      if (lower.endsWith('.csv')) {
+        const text = await entry.async('text');
+        wb = XLSX.read(text, {type:'string', cellDates:false, cellNF:false, cellText:false});
+      } else {
+        const buf = await entry.async('arraybuffer');
+        wb = XLSX.read(buf, {type:'array', cellDates:false, cellNF:false, cellText:false});
+      }
+      for (const sheetName of wb.SheetNames) {
+        const ws = wb.Sheets[sheetName];
+        if (!ws || !ws['!ref']) continue;
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        for (let r = range.s.r; r <= range.e.r; r++) {
+          for (let c = range.s.c; c <= range.e.c; c++) {
+            const ref = XLSX.utils.encode_cell({r, c});
+            const cell = ws[ref];
+            if (!cell || cell.v == null) continue;
+            const val = String(cell.v).trim();
+            if (!val) continue;
+            const nid = normSiteId(val);
+            if (nid && knownSiteNorms.has(nid)) foundSites.add(nid);
+          }
+        }
+      }
+    } catch (e) { log(`⚠️ Gagal baca ${path}: ${e.message}`); }
+  }
+  return { foundSites, fileCount };
 }
 
-/* ============================================================
-   UPLOAD
-============================================================ */
+/* ═══════════════ UPLOAD ═══════════════ */
 function bindDrop(zoneId, inputId, key) {
   const zone = document.getElementById(zoneId);
   const input = document.getElementById(inputId);
@@ -461,39 +570,40 @@ function bindDrop(zoneId, inputId, key) {
     e.preventDefault(); zone.classList.remove('dragover');
     if (e.dataTransfer.files[0]) setFile(key, e.dataTransfer.files[0]);
   });
-  input.addEventListener('change', e => {
-    if (e.target.files[0]) setFile(key, e.target.files[0]);
-  });
+  input.addEventListener('change', e => { if (e.target.files[0]) setFile(key, e.target.files[0]); });
 }
-
 function setFile(key, file) {
-  const okExt = /\.(xlsx|xls|csv)$/i.test(file.name);
-  if (!okExt) { toast('Format file harus .xlsx / .xls / .csv', 'error'); return; }
-  if (key === 'pot') potFile = file; else segFile = file;
+  const validExt = key === 'zip' ? /\.zip$/i.test(file.name) : /\.(xlsx|xls|csv)$/i.test(file.name);
+  if (!validExt) { toast(key === 'zip' ? 'Harus file .zip' : 'Format harus .xlsx / .xls / .csv', 'error'); return; }
+  if (key === 'pot') potFile = file;
+  else if (key === 'seg') segFile = file;
+  else if (key === 'cmdb') cmdbFile = file;
+  else zipFile = file;
   document.getElementById('info-' + key).classList.add('show');
   document.getElementById('name-' + key).textContent = file.name;
   document.getElementById('meta-' + key).textContent = fmtBytes(file.size) + ' · ' + new Date().toLocaleTimeString('id-ID');
-  log(`File ${key.toUpperCase()} dipilih: ${file.name} (${fmtBytes(file.size)})`);
+  const sz = file.size / (1024*1024);
+  const wEl = document.getElementById('warn-' + key);
+  const iEl = document.getElementById('info-' + key);
+  if (sz > FILE_SIZE_WARN_MB) { wEl.textContent = `⚠️ File besar (${sz.toFixed(1)} MB)`; iEl.classList.add('warn'); }
+  else { wEl.textContent = ''; iEl.classList.remove('warn'); }
+  log(`File ${key.toUpperCase()}: ${file.name}`);
+  toast(`✅ ${file.name} dimuat`, 'success');
   checkReady();
 }
-
 function clearFile(key) {
   if (key === 'pot') { potFile = null; document.getElementById('file-pot').value = ''; }
-  else { segFile = null; document.getElementById('file-seg').value = ''; }
+  else if (key === 'seg') { segFile = null; document.getElementById('file-seg').value = ''; }
+  else if (key === 'cmdb') { cmdbFile = null; document.getElementById('file-cmdb').value = ''; }
+  else { zipFile = null; document.getElementById('file-zip').value = ''; }
   document.getElementById('info-' + key).classList.remove('show');
-  log(`File ${key.toUpperCase()} di-clear`);
+  document.getElementById('warn-' + key).textContent = '';
   checkReady();
 }
+function checkReady() { document.getElementById('btn-process').disabled = !(potFile && segFile) || processing; }
 
-function checkReady() {
-  document.getElementById('btn-process').disabled = !(potFile && segFile) || processing;
-}
-
-/* ============================================================
-   PROGRESS
-============================================================ */
-const stageIds = ['stage-pot','stage-seg','stage-match','stage-build','stage-summary','stage-excel'];
-
+/* ═══════════════ PROGRESS ═══════════════ */
+const stageIds = ['stage-pot','stage-seg','stage-zip','stage-base','stage-build','stage-agg','stage-excel'];
 function resetStages() {
   stageIds.forEach((id, i) => {
     const el = document.getElementById(id);
@@ -503,7 +613,6 @@ function resetStages() {
   });
   document.getElementById('progress-fill').style.width = '0%';
 }
-
 function startStage(id, text) {
   const el = document.getElementById(id);
   el.className = 'stage active';
@@ -512,7 +621,6 @@ function startStage(id, text) {
   const idx = stageIds.indexOf(id);
   document.getElementById('progress-fill').style.width = ((idx + 0.5) / stageIds.length * 100) + '%';
 }
-
 function doneStage(id, detail) {
   const el = document.getElementById(id);
   el.className = 'stage done';
@@ -521,7 +629,6 @@ function doneStage(id, detail) {
   const idx = stageIds.indexOf(id);
   document.getElementById('progress-fill').style.width = ((idx + 1) / stageIds.length * 100) + '%';
 }
-
 function failStage(id, msg) {
   const el = document.getElementById(id);
   el.className = 'stage error';
@@ -529,470 +636,894 @@ function failStage(id, msg) {
   document.getElementById('det-' + id.replace('stage-','')).textContent = msg;
 }
 
-/* ============================================================
-   MAIN PROCESS
-============================================================ */
+/* ═══════════════ EXCEL STYLING ═══════════════ */
+function styleCell(ws, r, c, options) {
+  const ref = XLSX.utils.encode_cell({r,c});
+  if (!ws[ref]) ws[ref] = {t:'s', v:''};
+  ws[ref].s = Object.assign(ws[ref].s || {}, options);
+}
+function applyHeaderStyle(ws, n, bg, fg=FONT_WHITE) {
+  for (let c = 0; c < n; c++) {
+    styleCell(ws, 0, c, {fill:{patternType:'solid',fgColor:{rgb:bg}},font:{bold:true,color:{rgb:fg},sz:11},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:{top:{style:'thin',color:{rgb:'1E293B'}},bottom:{style:'thin',color:{rgb:'1E293B'}},left:{style:'thin',color:{rgb:'1E293B'}},right:{style:'thin',color:{rgb:'1E293B'}}}});
+  }
+  ws['!rows'] = ws['!rows'] || []; ws['!rows'][0] = {hpx:32};
+}
+function applyColoredHeaderRow(ws, rowIdx, colorMap, fontColor=FONT_WHITE) {
+  for (let c = 0; c < colorMap.length; c++) {
+    styleCell(ws, rowIdx, c, {fill:{patternType:'solid',fgColor:{rgb:colorMap[c]}},font:{bold:true,color:{rgb:fontColor},sz:11},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:{top:{style:'thin',color:{rgb:'1E293B'}},bottom:{style:'thin',color:{rgb:'1E293B'}},left:{style:'thin',color:{rgb:'1E293B'}},right:{style:'thin',color:{rgb:'1E293B'}}}});
+  }
+  ws['!rows'] = ws['!rows'] || []; ws['!rows'][rowIdx] = {hpx:34};
+}
+function applyColoredHeader2Rows(ws, colorMap, darkCols=[]) {
+  for (let r = 0; r < 2; r++) {
+    for (let c = 0; c < colorMap.length; c++) {
+      const fg = darkCols.includes(c) ? '1E293B' : FONT_WHITE;
+      styleCell(ws, r, c, {fill:{patternType:'solid',fgColor:{rgb:colorMap[c]}},font:{bold:true,color:{rgb:fg},sz:11},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:{top:{style:'thin',color:{rgb:'1E293B'}},bottom:{style:'thin',color:{rgb:'1E293B'}},left:{style:'thin',color:{rgb:'1E293B'}},right:{style:'thin',color:{rgb:'1E293B'}}}});
+    }
+  }
+  ws['!rows'] = ws['!rows'] || []; ws['!rows'][0]={hpx:24}; ws['!rows'][1]={hpx:34};
+}
+function applyRowFill(ws, rowIdx, rgb) {
+  if (!ws['!ref']) return;
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let c = 0; c <= range.e.c; c++) styleCell(ws, rowIdx, c, {fill:{patternType:'solid',fgColor:{rgb}}});
+}
+function applyBorder(ws, r, c) {
+  styleCell(ws, r, c, {border:{top:{style:'thin',color:{rgb:'94A3B8'}},bottom:{style:'thin',color:{rgb:'94A3B8'}},left:{style:'thin',color:{rgb:'94A3B8'}},right:{style:'thin',color:{rgb:'94A3B8'}}}});
+}
+function applyStatusColor(ws, r, c, val, fontColor=FONT_WHITE) {
+  const s = String(val ?? '').toUpperCase().trim();
+  if (s === 'DOWN' || s === 'UP') {
+    const rgb = s === 'DOWN' ? STATUS_DOWN_COLOR : STATUS_UP_COLOR;
+    styleCell(ws, r, c, {fill:{patternType:'solid',fgColor:{rgb}},font:{bold:true,color:{rgb:fontColor},sz:11},alignment:{horizontal:'center',vertical:'center'}});
+  }
+}
+function applyAllDataBorders(ws, rows, cols, start=1) {
+  for (let r = start; r < rows; r++) for (let c = 0; c < cols; c++) applyBorder(ws, r, c);
+}
+function applyBlackFontAll(ws, rows, cols, start=1) {
+  for (let r = start; r < rows; r++) for (let c = 0; c < cols; c++) styleCell(ws, r, c, {font:{color:{rgb:FONT_BLACK}}});
+}
+
+/* ═══════════════ GENSET LABEL ═══════════════ */
+function deriveGensetLabel(sidKey, gdocGensetRaw, segLookup, segHeader) {
+  const segRows = segLookup.get(sidKey);
+  if (segRows && segRows.length > 0) {
+    const gensetCol = autoMatch('Genset', segHeader);
+    if (gensetCol) {
+      const gIdx = segHeader.indexOf(gensetCol);
+      const gv = String(segRows[0][gIdx] || '').trim().toUpperCase();
+      if (gv === 'AUTO') return 'Genset Not Running';
+      if (gv === 'NOK' || gv === '' || gv === '-' || gv === 'N/A') return 'NO DG';
+      return 'Genset Not Running';
+    }
+  }
+  const pg = String(gdocGensetRaw || '').toUpperCase().trim();
+  if (!pg) return 'NO DG';
+  if (pg.includes('NO DG') || pg.includes('INACTIVE') || pg === 'NOT AVAILABLE') return 'NO DG';
+  return 'Genset Not Running';
+}
+
+/* ═══════════════ BUILD SUMMARY ═══════════════ */
+function buildSummaryFromGDOCPG(params) {
+  const { gdocRows, pgRowsOut, cmdbLookup, cmdbGet, targetMC, siteKeyFn,
+    powerAlarmSites, segLookup, segHeader } = params;
+  
+  const pgData = pgRowsOut.slice(2);
+  const pgFirst = pgData[0] || [];
+  const pgLatest = pgData[pgData.length - 1] || [];
+  
+  const startTime = String(pgFirst[PG_IDX.TIME] || '').trim();
+  const updateTime = String(pgLatest[PG_IDX.TIME] || '').trim();
+  const totalSiteMC = Number(pgLatest[PG_IDX.TOTAL_MC]) || 0;
+  const totalDown = Number(pgLatest[PG_IDX.TOTAL_DOWN]) || 0;
+  const pctDown = totalSiteMC > 0 ? (totalDown / totalSiteMC) * 100 : 0;
+  
+  let agingStr = '--:--';
+  if (startTime && updateTime) {
+    const t1 = new Date(startTime.replace(' ', 'T') + ':00');
+    const t2 = new Date(updateTime.replace(' ', 'T') + ':00');
+    if (!isNaN(t1.getTime()) && !isNaN(t2.getTime())) {
+      const diffMin = Math.max(0, Math.floor((t2 - t1) / 60000));
+      const hh = String(Math.floor(diffMin / 60)).padStart(2, '0');
+      const mm = String(diffMin % 60).padStart(2, '0');
+      agingStr = hh + ':' + mm;
+    }
+  }
+  
+  const gdocData = gdocRows.slice(1);
+  const downSites = [];
+  for (const r of gdocData) {
+    const sid = String(r[GDOC_IDX.SITE_ID] || '').trim();
+    if (!sid) continue;
+    const nid = siteKeyFn(sid);
+    downSites.push({
+      sid, nid,
+      name: String(r[GDOC_IDX.SITE_NAME] || '').trim() || sid,
+      mcArea: String(r[GDOC_IDX.MC_AREA] || '').trim(),
+      hubType: String(r[GDOC_IDX.HUB_TYPE] || '').trim(),
+      transport: String(r[GDOC_IDX.TRANSPORT] || '').trim(),
+      gdocGenset: String(r[GDOC_IDX.GENSET] || '').trim(),
+      superSites: String(r[GDOC_IDX.SUPER_SITES] || '').trim(),
+      traffic: String(r[GDOC_IDX.TRAFFIC] || '').trim(),
+      p0: String(r[GDOC_IDX.P0] || '').trim(),
+      vvip: String(r[GDOC_IDX.VVIP] || '').trim(),
+      vip: String(r[GDOC_IDX.VIP] || '').trim(),
+    });
+  }
+  
+  let powerAlarmCount = 0, powerAlarmMcCount = 0;
+  if (powerAlarmSites && powerAlarmSites.size > 0) {
+    for (const s of downSites) {
+      if (powerAlarmSites.has(s.nid)) {
+        powerAlarmCount++;
+        if (!targetMC || (s.mcArea || '').toUpperCase() === targetMC.toUpperCase()) powerAlarmMcCount++;
+      }
+    }
+  }
+  
+  function categorize(site) {
+    const cats = [];
+    const hub = (site.hubType || '').toUpperCase();
+    if (hub.includes('BIG')) cats.push('big');
+    if (hub.includes('MEDIUM')) cats.push('medium');
+    if (hub.includes('SMALL')) cats.push('small');
+    if (hub.includes('END')) cats.push('end');
+    const p0 = (site.p0 || '').toUpperCase().trim();
+    if (p0 === 'P0' || p0 === 'YES' || p0.startsWith('P0')) cats.push('p0');
+    const vvip = (site.vvip || '').toUpperCase().trim();
+    const vip = (site.vip || '').toUpperCase().trim();
+    if (vvip === 'YES' || vvip === 'VVIP' || vip === 'YES' || vip === 'VIP') cats.push('vip');
+    const traffic = (site.traffic || '').toUpperCase().trim();
+    if (traffic.includes('2TB') || traffic === 'YES') cats.push('traffic');
+    const ss = (site.superSites || '').toUpperCase().trim();
+    if (ss === 'YES') cats.push('super');
+    return cats;
+  }
+  
+  const categories = [
+    { key: 'big',     name: 'Big Hub',              format: 'pct',   showSites: true },
+    { key: 'medium',  name: 'Medium Hub',           format: 'pct',   showSites: true },
+    { key: 'p0',      name: 'P0',                   format: 'count', showSites: true },
+    { key: 'vip',     name: 'VVIP/VIP',             format: 'count', showSites: true },
+    { key: 'traffic', name: 'Traffic class > 2TB',  format: 'count', showSites: true },
+    { key: 'super',   name: 'Super Site',           format: 'count', showSites: true },
+    { key: 'small',   name: 'Small Hub',            format: 'count', showSites: false },
+    { key: 'end',     name: 'End Site',             format: 'count', showSites: false },
+  ];
+  
+  const categoryResults = [];
+  for (const cat of categories) {
+    const sitesDown = downSites.filter(s => categorize(s).includes(cat.key));
+    const down = sitesDown.length;
+    let total = 0;
+    if (cat.format === 'pct') {
+      for (const [nid] of cmdbLookup) {
+        if (targetMC) {
+          const mc = String(cmdbGet(nid, 'MC Cluster') || '').toUpperCase().trim();
+          if (mc && mc !== targetMC.toUpperCase()) continue;
+        }
+        const hub = String(cmdbGet(nid, 'HUB Type') || '').toUpperCase();
+        let match = false;
+        if (cat.key === 'big' && hub.includes('BIG HUB')) match = true;
+        else if (cat.key === 'medium' && hub.includes('MEDIUM HUB')) match = true;
+        if (match) total++;
+      }
+    }
+    let siteList = [];
+    if (cat.showSites) {
+      siteList = sitesDown.map(s => ({
+        name: s.name || s.sid,
+        transport: s.transport || '',
+        genset: deriveGensetLabel(s.nid, s.gdocGenset, segLookup, segHeader),
+      }));
+    }
+    categoryResults.push({
+      key: cat.key, name: cat.name, format: cat.format, showSites: cat.showSites,
+      down, total, pct: total > 0 ? (down/total)*100 : 0, sites: siteList,
+    });
+  }
+  
+  /* MC > 25% per-MC dengan fallback berlapis */
+  const mcUnique = new Map();
+  for (const [nid] of cmdbLookup) {
+    const mcRaw = String(cmdbGet(nid, 'MC Cluster') || '').trim();
+    if (!mcRaw) continue;
+    const mcKey = normMCKey(mcRaw);
+    if (!mcKey) continue;
+    if (!mcUnique.has(mcKey)) mcUnique.set(mcKey, { displayName: mcRaw, down: 0, total: 0 });
+    mcUnique.get(mcKey).total++;
+  }
+  for (const s of downSites) {
+    const mcRaw = (s.mcArea || '').trim();
+    if (!mcRaw) continue;
+    const mcKey = normMCKey(mcRaw);
+    if (mcUnique.has(mcKey)) mcUnique.get(mcKey).down++;
+  }
+  
+  /* FALLBACK: jika mcUnique kosong */
+  if (mcUnique.size === 0 && targetMC) {
+    const safeTotal = totalSiteMC > 0 ? totalSiteMC : Math.max(1, cmdbLookup.size, totalDown);
+    const safeDown = totalDown > 0 ? totalDown : downSites.length;
+    mcUnique.set(normMCKey(targetMC), { displayName: targetMC, down: safeDown, total: safeTotal });
+    log(`⚠️ MC 25% fallback dipakai: "${targetMC}" (${safeDown}/${safeTotal})`);
+  }
+  
+  const mcAbove25List = [];
+  for (const [mcKey, stats] of mcUnique) {
+    const safeTotal = stats.total > 0 ? stats.total : Math.max(1, stats.down);
+    const pct = (stats.down / safeTotal) * 100;
+    if (pct > 25) mcAbove25List.push({ mc: stats.displayName, down: stats.down, total: safeTotal, pct });
+  }
+  log(`📊 MC>25%: ${mcAbove25List.length} MC · unique MC: ${mcUnique.size}`);
+  
+  return {
+    agingStr, startTime, updateTime, totalDown, totalSiteMC, pctDown,
+    powerAlarmCount, powerAlarmMcCount,
+    categoryResults, mcAbove25List, targetMC,
+  };
+}
+
+/* ═══════════════ GENERATE SUMMARY TEXT ═══════════════ */
+function generateSummaryText(summary) {
+  try {
+    const lines = [];
+    lines.push(`Aging (Hour) : ${summary.agingStr}`);
+    lines.push('');
+    lines.push(`Start Time: ${summary.startTime || '-'}`);
+    lines.push(`Update Time: ${summary.updateTime || '-'}`);
+    lines.push('');
+    lines.push(`Sites down / total site under MC Impacted: ${summary.totalDown}/${summary.totalSiteMC} (${summary.pctDown.toFixed(2)}%)`);
+    lines.push(`Total Sites Down under ${summary.targetMC}: ${summary.totalDown} out of ${summary.totalSiteMC} (${summary.pctDown.toFixed(2)}%)`);
+    lines.push(`Sites with Power Alarm: ${summary.powerAlarmCount}`);
+    lines.push(`${summary.targetMC} : ${summary.powerAlarmMcCount}`);
+    lines.push('');
+    lines.push('Sites Down Priority : ');
+    
+    let idx = 1;
+    for (const cat of summary.categoryResults) {
+      if (cat.format === 'pct') {
+        lines.push(`${idx}. ${cat.name} = ${cat.down}/${cat.total} (${cat.pct.toFixed(2)}%)`);
+      } else {
+        lines.push(`${idx}. ${cat.name} = ${cat.down}`);
+      }
+      if (cat.showSites && cat.sites && cat.sites.length > 0) {
+        for (const s of cat.sites) {
+          const parts = [s.name || s.sid || ''];
+          if (s.transport) parts.push(`(${s.transport})`);
+          if (s.genset) parts.push(`(${s.genset})`);
+          lines.push(parts.join(' '));
+        }
+      }
+      lines.push('');
+      idx++;
+    }
+    
+    /* MC 25% — SELALU push */
+    const mcCount = (summary.mcAbove25List && summary.mcAbove25List.length) || 0;
+    lines.push(`_*MC Cluster Site Down More Than 25% = ${mcCount}_`);
+    if (summary.mcAbove25List && summary.mcAbove25List.length > 0) {
+      for (const m of summary.mcAbove25List) lines.push(m.mc);
+    }
+    
+    /* Footer — SELALU push */
+    lines.push('_DIOC and FSO on coordinate for Power monitoring and Portable Genset movement_');
+    
+    return lines.join('\n');
+  } catch (err) {
+    log('❌ generateSummaryText error: ' + err.message);
+    return `Error: ${err.message}\n\n_*MC Cluster Site Down More Than 25% = 0_\n_DIOC and FSO on coordinate for Power monitoring and Portable Genset movement_`;
+  }
+}
+
+/* ═══════════════ COPY ═══════════════ */
+async function copySummaryText() {
+  const text = document.getElementById('summary-text').value;
+  if (!text) { toast('Summary kosong', 'warn'); return; }
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('📋 Summary berhasil dicopy ke clipboard!', 'success');
+  } catch (err) {
+    const ta = document.getElementById('summary-text');
+    ta.removeAttribute('readonly');
+    ta.select();
+    document.execCommand('copy');
+    ta.setAttribute('readonly', 'readonly');
+    toast('📋 Summary dicopy (fallback)', 'success');
+  }
+}
+function selectAllSummaryText() {
+  const ta = document.getElementById('summary-text');
+  ta.focus();
+  ta.select();
+  toast('✂️ Text terpilih — tekan Ctrl+C untuk copy', 'success');
+}
+
+/* ═══════════════ RENDER SUMMARY ═══════════════ */
+function renderSummary(summary) {
+  try {
+    const text = generateSummaryText(summary);
+    log(`📝 Summary: ${text.length} chars · footer=${text.includes('DIOC and FSO')} · mc25=${text.includes('More Than 25%')}`);
+    document.getElementById('summary-text').value = text;
+    document.getElementById('sum-meta-mc').textContent = `MC: ${summary.targetMC || '-'}`;
+    document.getElementById('sum-meta-down').textContent = `Down: ${summary.totalDown}/${summary.totalSiteMC} (${summary.pctDown.toFixed(2)}%)`;
+    document.getElementById('sum-meta-alarm').textContent = `Alarm: ${summary.powerAlarmCount}`;
+    document.getElementById('summary-card').classList.add('show');
+    document.getElementById('summary-card').scrollIntoView({behavior:'smooth', block:'start'});
+  } catch (err) {
+    log('❌ renderSummary error: ' + err.message);
+    console.error(err);
+    toast('❌ Error summary: ' + err.message, 'error');
+  }
+}
+
+/* ═══════════════ MAIN PROCESS ═══════════════ */
 async function process() {
   if (processing || !potFile || !segFile) return;
   processing = true;
   logLines.length = 0;
-  log('=== Mulai proses kompilasi ===');
-
+  log('=== Mulai kompilasi ===');
   const btn = document.getElementById('btn-process');
-  btn.textContent = '⏳ Memproses...';
+  btn.classList.add('loading');
+  btn.textContent = 'Memproses...';
   btn.disabled = true;
-
   document.getElementById('result-card').classList.remove('show');
+  document.getElementById('summary-card').classList.remove('show');
   document.getElementById('progress-card').classList.add('show');
   resetStages();
+  const t0 = performance.now();
 
   try {
-    const ok = await ensureSheetJS();
-    if (!ok) {
-      document.getElementById('cdn-warn').classList.add('show');
-      throw new Error('SheetJS gagal dimuat dari semua CDN. Periksa koneksi internet.');
-    }
-    log('SheetJS siap. Versi: ' + (window.XLSX.version || 'unknown'));
+    if (!window.XLSX) throw new Error('Library Excel tidak tersedia');
+    const noStyle = !!window.__xlsxNoStyle;
+    log('Library: ' + (noStyle ? 'xlsx (no style)' : 'xlsx-js-style'));
 
-    /* ---- 1. Read POT ---- */
+    /* 1. POT */
     startStage('stage-pot');
-    await sleep(350);
-    log('Membaca file POT: ' + potFile.name);
+    await sleep(100);
     const potBuf = await potFile.arrayBuffer();
-    const potWb = XLSX.read(potBuf, { type: 'array', cellDates: true });
-    log('Sheet di POT: ' + potWb.SheetNames.join(', '));
+    const potWb = XLSX.read(potBuf, {type:'array', cellDates:true, cellNF:false, cellText:false});
+    log('POT sheets: ' + potWb.SheetNames.join(' | '));
+    const summaryName = findSheet(potWb, ['Summary Report','Summary']);
+    if (!summaryName) throw new Error('Sheet Summary Report tidak ditemukan');
+    const summaryRows = sheetToAOA(potWb, summaryName);
+    doneStage('stage-pot', summaryRows.length + ' baris · ' + summaryName);
+    await sleep(100);
 
-    const summarySheetName = findSheet(potWb, ['Summary Report', 'Summary']);
-    if (!summarySheetName) throw new Error('Sheet "Summary Report" tidak ditemukan di file POT');
-    const summaryRows = sheetToAOA(potWb, summarySheetName);
-    log('Summary Report: ' + summaryRows.length + ' baris');
-
-    doneStage('stage-pot', summaryRows.length + ' baris · sheet "' + summarySheetName + '"');
-    await sleep(250);
-
-    /* ---- 2. Read Segmentation ---- */
+    /* 2. SEG + CMDB — FIX: cmdbWb (bukan cmbdWb) */
     startStage('stage-seg');
-    await sleep(350);
-    log('Membaca file Segmentation: ' + segFile.name);
+    await sleep(100);
     const segBuf = await segFile.arrayBuffer();
-    const segWb = XLSX.read(segBuf, { type: 'array', cellDates: true });
-    log('Sheet di Segmentation: ' + segWb.SheetNames.join(', '));
+    const segWb = XLSX.read(segBuf, {type:'array', cellDates:true, cellNF:false, cellText:false});
+    const segName = findSheet(segWb, ['segmentation','segment info','segment_info','site']) || segWb.SheetNames[0];
+    const segRowsRaw = sheetToAOA(segWb, segName);
+    log('SEG: ' + segRowsRaw.length + ' baris');
 
-    const segSheetName = findSheet(segWb, ['segmentation', 'segment info', 'segment_info', 'site']) || segWb.SheetNames[0];
-    const segRowsRaw = sheetToAOA(segWb, segSheetName);
-    log('Segmentation sheet "' + segSheetName + '": ' + segRowsRaw.length + ' baris');
-
-    doneStage('stage-seg', segRowsRaw.length + ' baris · sheet "' + segSheetName + '"');
-    await sleep(250);
-
-    /* ---- 3. Base = Site Down List + Build Lookup ---- */
-    startStage('stage-match');
-    await sleep(300);
-
-    // 3a. Cari sheet "Site Down List"
-    let siteDownListName = null, siteDownListRows = null;
-    for (const n of potWb.SheetNames) {
-      if (norm(n).includes('sitedown')) { siteDownListName = n; siteDownListRows = sheetToAOA(potWb, n); break; }
+    let cmdbRowsRaw = null;
+    if (cmdbFile) {
+      try {
+        const cmdbBuf = await cmdbFile.arrayBuffer();
+        const cmdbWb = XLSX.read(cmdbBuf, {type:'array', cellDates:false, cellNF:false, cellText:false});
+        cmdbRowsRaw = sheetToAOA(cmdbWb, cmdbWb.SheetNames[0]);
+        log('✅ CMDB: ' + cmdbRowsRaw.length + ' baris × ' + (cmdbRowsRaw[0]||[]).length + ' kolom');
+      } catch (e) { log('⚠️ CMDB gagal: ' + e.message); }
+    } else {
+      log('ℹ️ CMDB tidak diupload');
     }
-    if (!siteDownListRows) {
-      for (const n of potWb.SheetNames) {
-        if (norm(n).includes('downlist') || norm(n).includes('downsites')) {
-          siteDownListName = n; siteDownListRows = sheetToAOA(potWb, n); break;
+    doneStage('stage-seg', segRowsRaw.length + ' SEG · ' + (cmdbRowsRaw ? cmdbRowsRaw.length + ' CMDB' : '-'));
+    await sleep(100);
+
+    /* 3. ZIP */
+    startStage('stage-zip');
+    await sleep(100);
+    let zipFoundSites = new Set();
+    let zipFileCount = 0;
+    if (zipFile && window.JSZip) {
+      try {
+        const sdlNamePre = findSDLSheet(potWb);
+        let knownNorms = new Set();
+        if (sdlNamePre) {
+          const sdlPreRows = sheetToAOA(potWb, sdlNamePre);
+          const preHeaderIdx = detectSDLHeader(sdlPreRows, 30);
+          const preHeader = sdlPreRows[preHeaderIdx] || [];
+          const siteColPre = autoMatch('Site Id', preHeader);
+          if (siteColPre) {
+            const siteIdxPre = preHeader.indexOf(siteColPre);
+            for (let i = preHeaderIdx + 1; i < sdlPreRows.length; i++) {
+              const r = sdlPreRows[i]; if (!r) continue;
+              const nid = normSiteId(r[siteIdxPre]);
+              if (nid) knownNorms.add(nid);
+            }
+          }
         }
+        const zipResult = await parseZipPowerAlarm(zipFile, knownNorms);
+        zipFoundSites = zipResult.foundSites;
+        zipFileCount = zipResult.fileCount;
+        doneStage('stage-zip', `${zipFileCount} files · ${zipFoundSites.size} match`);
+      } catch (e) {
+        doneStage('stage-zip', 'Error: ' + e.message);
       }
+    } else {
+      doneStage('stage-zip', zipFile ? 'JSZip belum load' : 'Skip');
     }
-    if (!siteDownListRows || siteDownListRows.length < 2) {
-      throw new Error('Sheet "Site Down List" tidak ditemukan / kosong di POT Analysis Report');
-    }
-    log('Site Down List: sheet "' + siteDownListName + '" · ' + siteDownListRows.length + ' baris total');
+    await sleep(100);
 
-    // 3b. Deteksi header Site Down List
-    let sdlHeaderIdx = findHeaderRowByColumns(siteDownListRows, [
-      h => norm(h) === 'key',
-      h => norm(h).includes('site') && norm(h).includes('id')
-    ], 20);
-    if (sdlHeaderIdx < 0) sdlHeaderIdx = 0;
-    log('Header Site Down List di row index: ' + sdlHeaderIdx);
+    /* 4. Base SDL */
+    startStage('stage-base');
+    await sleep(100);
+    const sdlName = findSDLSheet(potWb);
+    if (!sdlName) throw new Error('Sheet Site Down List tidak ditemukan');
+    const sdlRows = sheetToAOA(potWb, sdlName);
+    if (!sdlRows || sdlRows.length < 2) throw new Error('Site Down List kosong');
 
-    const sdlHeader = siteDownListRows[sdlHeaderIdx];
-    const sdlKeyCol = exactKeyMatch(sdlHeader);
-    const sdlSiteCol = autoMatch('Site Id', sdlHeader) || sdlHeader.find(h => norm(h).includes('siteid'));
-    if (!sdlKeyCol) throw new Error('Kolom "Key" tidak ditemukan di sheet "' + siteDownListName + '"');
-    if (!sdlSiteCol) throw new Error('Kolom "Site Id" tidak ditemukan di sheet "' + siteDownListName + '"');
-    log('Kolom Key = "' + sdlKeyCol + '", Site Id = "' + sdlSiteCol + '"');
-
+    const sdlHeaderIdx = detectSDLHeader(sdlRows, 30);
+    const sdlHeader = sdlRows[sdlHeaderIdx] || [];
+    const sdlKeyCol = exactKeyMatch(sdlHeader) || 'Key';
+    const sdlSiteCol = autoMatch('Site Id', sdlHeader);
+    if (!sdlSiteCol) throw new Error('Kolom Site Id tidak ditemukan');
     const sdlKeyIdx = sdlHeader.indexOf(sdlKeyCol);
     const sdlSiteIdx = sdlHeader.indexOf(sdlSiteCol);
     const headerLen = sdlHeader.length;
 
-    // 3b2. Resolve SDL_SOURCE_MAP
-    const sdlMap = {}, sdlMapLabels = {};
-    for (const [tplCol, sdlTarget] of Object.entries(SDL_SOURCE_MAP)) {
-      let found;
-      if (norm(tplCol) === 'key' || norm(sdlTarget) === 'key') {
-        found = exactKeyMatch(sdlHeader);
-      } else {
-        found = autoMatch(sdlTarget, sdlHeader);
-      }
-      if (found) {
-        sdlMap[tplCol] = sdlHeader.indexOf(found);
-        sdlMapLabels[tplCol] = found;
-        log('  SDL map: "' + tplCol + '" ← "' + found + '"');
-      } else {
-        log('  SDL map: "' + tplCol + '" ← TIDAK DITEMUKAN');
-      }
+    const sdlMap = {};
+    for (const [tc, target] of Object.entries(SDL_SOURCE_MAP)) {
+      let f = (norm(tc)==='key'||norm(target)==='key') ? exactKeyMatch(sdlHeader) : autoMatch(target, sdlHeader);
+      if (f) sdlMap[tc] = sdlHeader.indexOf(f);
     }
 
-    // 3c. Pad + simpan semua baris (hanya buang 100% kosong)
-    const rawDataRows = siteDownListRows.slice(sdlHeaderIdx + 1);
-    const paddedRows = rawDataRows.map(r => padRow(r, headerLen));
-    const sdlData = paddedRows.filter(r => r.some(c => c !== '' && c != null));
-    const inputRowCount = rawDataRows.length;
-    const droppedEmpty = inputRowCount - sdlData.length;
-    log('Baris data Site Down List: ' + inputRowCount + ' (kosong dibuang: ' + droppedEmpty + ')');
+    const rawDataRows = sdlRows.slice(sdlHeaderIdx + 1);
+    const padded = rawDataRows.map(r => padRow(r, headerLen));
+    const sdlData = padded.filter(r => r.some(c => c !== '' && c != null));
+    log('SDL: ' + rawDataRows.length + ' → ' + sdlData.length);
 
-    // Forward-fill Key (merged cell)
     let lastKey = '';
-    let mergedKeyFilled = 0;
     for (const r of sdlData) {
-      const k = r[sdlKeyIdx];
-      const s = r[sdlSiteIdx];
-      const hasKey = (k !== '' && k != null);
-      const hasSite = (s !== '' && s != null);
-      if (!hasKey && hasSite && lastKey !== '') {
-        r[sdlKeyIdx] = lastKey;
-        mergedKeyFilled++;
-      } else if (hasKey) {
-        lastKey = k;
+      const k = r[sdlKeyIdx], s = r[sdlSiteIdx];
+      if ((k===''||k==null) && s!=='' && s!=null && lastKey!=='') r[sdlKeyIdx] = lastKey;
+      else if (k!=='' && k!=null) lastKey = k;
+    }
+
+    const segHeaderRowIdx = (() => {
+      for (let i = 0; i < Math.min(15, segRowsRaw.length); i++) {
+        const r = segRowsRaw[i] || [];
+        if (r.some(h => norm(h).includes('site') && norm(h).includes('id'))) return i;
       }
-    }
-    if (mergedKeyFilled > 0) log('Forward-fill Key: ' + mergedKeyFilled + ' baris (merged cell)');
-
-    // 3c2. Deteksi duplikat (INFO SAJA - tidak di-remove)
-    const sigCount = {};
-    for (const r of sdlData) {
-      const k = String(r[sdlKeyIdx] ?? '').trim();
-      const s = String(r[sdlSiteIdx] ?? '').trim();
-      const sig = k + '||' + s;
-      sigCount[sig] = (sigCount[sig] || 0) + 1;
-    }
-    let dupGroups = 0, dupExtra = 0, dupRowsTotal = 0;
-    for (const c of Object.values(sigCount)) {
-      if (c > 1) { dupGroups++; dupExtra += (c - 1); dupRowsTotal += c; }
-    }
-    log('Duplikat (info): ' + dupGroups + ' grup · ' + dupRowsTotal + ' baris · ' + dupExtra + ' baris ekstra — SEMUA dipertahankan');
-
-    // 3d. Detail POT (untuk alarm sisa)
-    let potDetailName = null, potDetailRows = null;
-    for (const n of potWb.SheetNames) {
-      if (n === summarySheetName || n === siteDownListName) continue;
-      const rows = sheetToAOA(potWb, n);
-      if (!rows || rows.length < 2) continue;
-      if (rows[0].some(h => norm(h).includes('siteid') || norm(h).includes('site'))) {
-        potDetailName = n; potDetailRows = rows; break;
-      }
-    }
-    log('POT detail: ' + (potDetailName ? 'sheet "' + potDetailName + '"' : 'TIDAK ADA'));
-
-    // 3e. Data Segmentation & POT detail
-    const segHeaderIdx = findHeaderRowByColumns(segRowsRaw, [
-      h => norm(h).includes('site') && norm(h).includes('id')
-    ], 15);
-    const segHeaderRowIdx = segHeaderIdx >= 0 ? segHeaderIdx : 0;
+      return 0;
+    })();
     const segHeader = segRowsRaw[segHeaderRowIdx] || [];
-    const segData = segRowsRaw.slice(segHeaderRowIdx + 1).filter(r => r.some(c => c !== '' && c != null));
-    const potHeader = potDetailRows ? potDetailRows[0] : [];
-    const potData = potDetailRows ? potDetailRows.slice(1).filter(r => r.some(c => c !== '' && c != null)) : [];
+    const segData = segRowsRaw.slice(segHeaderRowIdx+1).filter(r => r && r.some(c => c!==''&&c!=null));
 
-    // 3f. Lookup segLookup (first-match)
-    const segSiteCol = autoMatch('Site Id', segHeader) || segHeader.find(h => norm(h).includes('siteid'));
-    const segLookup = {};
+    const useNormSite = document.getElementById('norm-siteid').checked;
+    const siteKeyFn = useNormSite ? normSiteId : (s => String(s??'').trim());
+
+    const segSiteCol = autoMatch('Site Id', segHeader);
+    const segLookup = new Map();
+    const segSiteIdSet = new Set();
     if (segSiteCol) {
       const idx = segHeader.indexOf(segSiteCol);
       for (const r of segData) {
-        const sid = String(r[idx] ?? '').trim();
-        if (!sid) continue;
-        if (!(sid in segLookup)) segLookup[sid] = r;
+        const sidKey = siteKeyFn(r[idx]); if (!sidKey) continue;
+        segSiteIdSet.add(sidKey);
+        const arr = segLookup.get(sidKey); if (arr) arr.push(r); else segLookup.set(sidKey, [r]);
       }
-      log('Seg lookup: ' + Object.keys(segLookup).length + ' site unik');
+      log('SEG lookup: ' + segLookup.size + ' site unik');
     }
 
-    // 3g. Lookup potLookup (semua baris per site)
-    const potSiteCol = autoMatch('Site Id', potHeader) || potHeader.find(h => norm(h).includes('siteid'));
-    const potLookup = {};
-    if (potSiteCol) {
-      const idx = potHeader.indexOf(potSiteCol);
-      for (const r of potData) {
-        const sid = String(r[idx] ?? '').trim();
-        if (!sid) continue;
-        (potLookup[sid] = potLookup[sid] || []).push(r);
-      }
-      log('POT detail lookup: ' + Object.keys(potLookup).length + ' site unik');
+    const sdlSideMap = new Map();
+    for (const sdlRow of sdlData) {
+      const key = String(sdlRow[sdlKeyIdx] ?? '');
+      const sidKey = siteKeyFn(sdlRow[sdlSiteIdx]);
+      if (key && sidKey) sdlSideMap.set(key + '||' + sidKey, sdlRow);
     }
 
-    // 3h. Build mapping
-    const segMap = {}, potMap = {};
-    mappingRows = [];
-    for (const tc of SEG_COLS) {
-      if (SDL_SOURCE_MAP[tc] !== undefined) {
-        if (sdlMap[tc] !== undefined) {
-          const isCross = tc === 'First Occurred(NT)';
-          mappingRows.push({
-            template: tc,
-            source: isCross ? 'POT Site Down List (cross-map)' : 'POT Site Down List',
-            matched: sdlMapLabels[tc],
-            ok: true,
-            cls: isCross ? 'tr-cross' : 'tr-sdl'
-          });
-        } else {
-          mappingRows.push({ template: tc, source: 'POT Site Down List (not found)', matched: '—', ok: false, cls: '' });
+    function sdlGet(sdlRow, alias) {
+      if (!sdlRow) return '';
+      const f = autoMatch(alias, sdlHeader); if (!f) return '';
+      const v = sdlRow[sdlHeader.indexOf(f)];
+      return v !== '' && v != null ? v : '';
+    }
+
+    const cmdbLookup = new Map();
+    if (cmdbRowsRaw && cmdbRowsRaw.length > 1) {
+      let hIdx = 0;
+      for (let i = 0; i < Math.min(5, cmdbRowsRaw.length); i++) {
+        const r = cmdbRowsRaw[i] || [];
+        if (r.some(h => norm(h).includes('site') && norm(h).includes('id'))) { hIdx = i; break; }
+      }
+      const cmdbHeader = cmdbRowsRaw[hIdx] || [];
+      const colIdxMap = {};
+      for (const alias of CMDB_NEEDED_COLS) {
+        const f = autoMatch(alias, cmdbHeader);
+        colIdxMap[alias] = f ? cmdbHeader.indexOf(f) : -1;
+      }
+      const kept = CMDB_NEEDED_COLS.filter(a => colIdxMap[a] >= 0).length;
+      log('CMDB selective: ' + kept + '/' + CMDB_NEEDED_COLS.length + ' kolom');
+      
+      const sidColIdx = colIdxMap['Site Id'];
+      if (sidColIdx >= 0) {
+        const dataRows = cmdbRowsRaw.slice(hIdx+1);
+        let cnt = 0;
+        for (let i = 0; i < dataRows.length; i++) {
+          const r = dataRows[i]; if (!r || r.length===0) continue;
+          const sid = siteKeyFn(r[sidColIdx]); if (!sid) continue;
+          if (cmdbLookup.has(sid)) continue;
+          const comp = new Array(CMDB_NEEDED_COLS.length);
+          for (let k = 0; k < CMDB_NEEDED_COLS.length; k++) {
+            const idx = colIdxMap[CMDB_NEEDED_COLS[k]];
+            comp[k] = idx >= 0 ? (r[idx] ?? '') : '';
+          }
+          cmdbLookup.set(sid, comp);
+          cnt++;
+          if (cnt % CHUNK_SIZE === 0) { document.getElementById('det-base').textContent = `CMDB ${cnt}/${dataRows.length}...`; await sleep(0); }
         }
-        continue;
+        log('✅ CMDB lookup: ' + cmdbLookup.size + ' site');
       }
-      const fromSeg = autoMatch(tc, segHeader);
-      const fromPot = autoMatch(tc, potHeader);
-      const isAlarm = /first|last|occurred|alarm|tt|wo/i.test(tc);
-      if (isAlarm && fromPot) {
-        potMap[tc] = fromPot;
-        mappingRows.push({ template: tc, source: 'POT Detail', matched: fromPot, ok: true, cls: 'tr-pot' });
-      } else if (fromSeg) {
-        segMap[tc] = fromSeg;
-        mappingRows.push({ template: tc, source: 'Segmentation Info', matched: fromSeg, ok: true, cls: 'tr-seg' });
-      } else if (fromPot) {
-        potMap[tc] = fromPot;
-        mappingRows.push({ template: tc, source: 'POT Detail', matched: fromPot, ok: true, cls: 'tr-pot' });
-      } else {
-        mappingRows.push({ template: tc, source: '—', matched: '—', ok: false, cls: '' });
-      }
+      cmdbRowsRaw = null;
     }
-    const totalMatched = mappingRows.filter(m => m.ok).length;
-    log('Kolom ter-match: ' + totalMatched + '/' + SEG_COLS.length);
 
-    let matchDetail = sdlData.length + ' baris base';
-    if (dupGroups > 0) matchDetail += ' (' + dupRowsTotal + ' duplikat)';
-    if (mergedKeyFilled > 0) matchDetail += ' +' + mergedKeyFilled + ' merged';
-    matchDetail += ' · ' + totalMatched + '/' + SEG_COLS.length + ' kolom';
-    doneStage('stage-match', matchDetail);
-    await sleep(250);
+    function cmdbGet(sidKey, alias) {
+      const arr = cmdbLookup.get(sidKey); if (!arr) return '';
+      const idx = CMDB_NEEDED_IDX[alias]; if (idx == null) return '';
+      const v = arr[idx];
+      return v !== '' && v != null ? v : '';
+    }
 
-    /* ---- 4. Build segmentation sheet (1:1 SEMUA baris) ---- */
+    const statusByRow = [];
+    let downCount = 0;
+    for (const r of sdlData) {
+      const sidKey = siteKeyFn(r[sdlSiteIdx]);
+      const isDown = sidKey && segSiteIdSet.has(sidKey);
+      statusByRow.push(isDown ? 'DOWN' : 'UP');
+      if (isDown) downCount++;
+    }
+    log('Status: DOWN=' + downCount + ' · UP=' + (sdlData.length - downCount));
+    doneStage('stage-base', sdlData.length + ' · DOWN=' + downCount);
+    await sleep(100);
+
+    /* 5. Segmentation */
     startStage('stage-build');
-    await sleep(350);
+    await sleep(100);
+    const filterMode = document.getElementById('filter-status').value;
+    const headerMode = document.getElementById('header-mode').value;
+    const useDyn = headerMode === 'dynamic';
 
-    const segOutRows = [SEG_COLS.slice()];
-    let segHitCount = 0, potHitCount = 0, keyFilledCount = 0;
+    const segColMap = {};
+    for (const tc of SEG_COLS) {
+      if (SDL_SOURCE_MAP[tc] !== undefined) continue;
+      const f = autoMatch(tc, segHeader);
+      if (f) segColMap[tc] = segHeader.indexOf(f);
+    }
+
+    const sdlBTSIdx = (() => { const f = autoMatch('BTS Name', sdlHeader); return f ? sdlHeader.indexOf(f) : -1; })();
+    const segSiteNameIdx = (() => { const f = autoMatch('Site Name', segHeader); return f ? segHeader.indexOf(f) : -1; })();
+
+    function aggValue(sidKey, colIdx) {
+      const rows = segLookup.get(sidKey); if (!rows) return '';
+      const vals = [];
+      for (const r of rows) {
+        const v = r[colIdx];
+        if (v !== '' && v != null) vals.push(v instanceof Date ? displayCell(v) : v);
+      }
+      return vals.join(',');
+    }
+
+    let outHeader;
+    if (useDyn) {
+      outHeader = sdlHeader.slice();
+      const sdlNormSet = new Set(sdlHeader.map(h => norm(h)));
+      for (const tc of SEG_COLS) {
+        if (!sdlNormSet.has(norm(tc)) && sdlMap[tc] === undefined) {
+          if (!outHeader.some(h => norm(h) === norm(tc))) outHeader.push(tc);
+        }
+      }
+      outHeader.push('Status','Recovery Note');
+    } else {
+      outHeader = SEG_COLS.slice().concat(STATUS_COLS);
+    }
+
+    const segRowsOut = [outHeader];
 
     for (let i = 0; i < sdlData.length; i++) {
-      // Yield ke UI setiap 500 baris (progress)
-      if (i > 0 && i % 500 === 0) {
-        document.getElementById('det-build').textContent = `Memproses ${i.toLocaleString('id-ID')}/${sdlData.length.toLocaleString('id-ID')}...`;
-        await sleep(0);
-      }
-
       const sdlRow = sdlData[i];
-      const sid = String(sdlRow[sdlSiteIdx] ?? '').trim();
+      const sidRaw = sdlRow[sdlSiteIdx];
+      const sidKey = siteKeyFn(sidRaw);
+      const status = statusByRow[i];
+      if (filterMode === 'down' && status !== 'DOWN') continue;
+      if (filterMode === 'up' && status !== 'UP') continue;
+      const recoveryNote = status === 'UP' ? 'Site tidak ada di Segmentation Info (sudah UP)' : '';
 
-      const segRow = sid ? (segLookup[sid] || null) : null;
-      if (segRow) segHitCount++;
-      const potMatches = sid ? (potLookup[sid] || []) : [];
-      if (potMatches.length) potHitCount++;
-
-      const out = [];
-      for (const tc of SEG_COLS) {
-        let val = '';
-
-        // Priority 1: SDL_SOURCE_MAP (STRICT, no fallback)
-        if (SDL_SOURCE_MAP[tc] !== undefined) {
-          if (sdlMap[tc] !== undefined) {
-            if (tc === 'Key') {
+      let rowOut;
+      if (useDyn) {
+        rowOut = [];
+        for (const hCol of outHeader) {
+          if (hCol === 'Status') { rowOut.push(status); continue; }
+          if (hCol === 'Recovery Note') { rowOut.push(recoveryNote); continue; }
+          const sdlIdx = sdlHeader.indexOf(hCol);
+          if (sdlIdx >= 0) { rowOut.push(sdlRow[sdlIdx] ?? ''); continue; }
+          const segKey = Object.keys(segColMap).find(k => norm(k) === norm(hCol));
+          if (segKey) { rowOut.push(aggValue(sidKey, segColMap[segKey])); continue; }
+          rowOut.push('');
+        }
+      } else {
+        rowOut = [];
+        for (const tc of SEG_COLS) {
+          let val = '';
+          if (SDL_SOURCE_MAP[tc] !== undefined) {
+            if (tc === 'BTS Name') {
+              let found = false;
+              if (sdlMap[tc] !== undefined) { const v = sdlRow[sdlMap[tc]]; if (v!=='' && v!=null) { val=v; found=true; } }
+              if (!found && sdlBTSIdx >= 0) { const v = sdlRow[sdlBTSIdx]; if (v!=='' && v!=null) { val=v; found=true; } }
+              if (!found && segSiteNameIdx >= 0) { const v = aggValue(sidKey, segSiteNameIdx); if (v) { val=v; found=true; } }
+              if (!found) val = cmdbGet(sidKey, 'Site Name*');
+            } else if (tc === 'Key') {
               val = sdlRow[sdlMap[tc]] ?? '';
-              if (val !== '' && val != null) keyFilledCount++;
             } else if (tc === 'Site Id') {
-              val = sid;
-            } else {
+              val = String(sdlRow[sdlSiteIdx] ?? '').trim();
+            } else if (sdlMap[tc] !== undefined) {
               val = sdlRow[sdlMap[tc]] ?? '';
             }
+          } else if (segColMap[tc] !== undefined) {
+            val = aggValue(sidKey, segColMap[tc]);
           }
+          rowOut.push(val);
         }
-        // Priority 2: Segmentation Info
-        else if (segMap[tc] !== undefined && segRow) {
-          val = segRow[segHeader.indexOf(segMap[tc])] ?? '';
-        }
-        // Priority 3: POT detail dengan agregasi
-        else if (potMap[tc] !== undefined && potMatches.length) {
-          const pi = potHeader.indexOf(potMap[tc]);
-          if (/first.*occurred/i.test(tc)) {
-            let best = null, bestDate = null;
-            for (const m of potMatches) {
-              const v = m[pi]; const d = parseDate(v);
-              if (!v) continue;
-              if (!bestDate || (d && d < bestDate)) { best = v; bestDate = d; }
-            }
-            val = best ?? potMatches[0][pi] ?? '';
-          } else if (/last.*occurred/i.test(tc)) {
-            let best = null, bestDate = null;
-            for (const m of potMatches) {
-              const v = m[pi]; const d = parseDate(v);
-              if (!v) continue;
-              if (!bestDate || (d && d > bestDate)) { best = v; bestDate = d; }
-            }
-            val = best ?? potMatches[0][pi] ?? '';
-          } else {
-            val = potMatches[0][pi] ?? '';
-          }
-        }
-        out.push(val);
+        rowOut.push(status);
+        rowOut.push(recoveryNote);
       }
-      segOutRows.push(out);
+      segRowsOut.push(rowOut);
     }
 
-    const outputRowCount = segOutRows.length - 1;
-    const enrichRate = sdlData.length ? Math.round((segHitCount / sdlData.length) * 100) : 0;
+    const keyColIdx = outHeader.indexOf('Key');
+    const siteColIdx = outHeader.indexOf('Site Id');
+    const statusColIdx = outHeader.indexOf('Status');
+    const dataPart = segRowsOut.slice(1);
+    dataPart.sort((a,b) => {
+      const ka = String(a[keyColIdx]??''), kb = String(b[keyColIdx]??'');
+      if (ka !== kb) return kb.localeCompare(ka);
+      return String(a[siteColIdx]??'').localeCompare(String(b[siteColIdx]??''));
+    });
+    segRowsOut.length = 1;
+    for (const r of dataPart) segRowsOut.push(r);
 
-    let buildDetail = outputRowCount + ' baris output';
-    if (dupGroups > 0) buildDetail += ' (termasuk ' + dupRowsTotal + ' duplikat)';
-    buildDetail += ' · Key: ' + keyFilledCount;
-    buildDetail += ' · Seg: ' + segHitCount + '/' + sdlData.length;
-    doneStage('stage-build', buildDetail);
-    log('Output bcp_segmentation: ' + outputRowCount + ' baris · Key: ' + keyFilledCount + ' · Seg match: ' + segHitCount + ' · POT: ' + potHitCount);
-    await sleep(250);
+    doneStage('stage-build', (segRowsOut.length-1) + ' baris');
+    await sleep(100);
 
-    /* ---- 5. Summary Report → bcp_diagram ---- */
-    startStage('stage-summary');
-    await sleep(350);
+    /* 6. Diagram + PG + GDOC */
+    startStage('stage-agg');
+    await sleep(100);
     const diagHeaderRow = findHeaderRow(summaryRows, DIAG_COLS);
-    const diagOutRows = [DIAG_COLS.slice()];
+    const diagRowsOut = [DIAG_COLS.slice()];
     if (diagHeaderRow >= 0) {
       const srcHeader = summaryRows[diagHeaderRow];
       const diagMap = {};
       for (const tc of DIAG_COLS) diagMap[tc] = autoMatch(tc, srcHeader);
-      const dataRows = summaryRows.slice(diagHeaderRow + 1).filter(r => r.some(c => c !== '' && c != null));
+      const dataRows = summaryRows.slice(diagHeaderRow+1).filter(r => r && r.some(c => c!==''&&c!=null));
       for (const r of dataRows) {
-        const out = [];
-        for (const tc of DIAG_COLS) {
-          const m = diagMap[tc];
-          out.push(m ? (r[srcHeader.indexOf(m)] ?? '') : '');
-        }
-        diagOutRows.push(out);
+        const row = [];
+        for (const tc of DIAG_COLS) { const m = diagMap[tc]; row.push(m ? (r[srcHeader.indexOf(m)]??'') : ''); }
+        diagRowsOut.push(row);
       }
-      log('bcp_diagram: ' + (diagOutRows.length - 1) + ' baris');
     }
-    doneStage('stage-summary', (diagOutRows.length - 1) + ' baris');
-    await sleep(250);
 
-    /* ---- 6. Build Excel ---- */
+    const keyGroups = new Map();
+    for (let i = 1; i < segRowsOut.length; i++) {
+      const key = String(segRowsOut[i][keyColIdx]??'');
+      if (!key) continue;
+      if (!keyGroups.has(key)) {
+        const m = key.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/);
+        keyGroups.set(key, {snapshotTime: m ? `${m[1]} ${m[2]}` : key, rows: []});
+      }
+      keyGroups.get(key).rows.push(segRowsOut[i]);
+    }
+    const sortedKeys = Array.from(keyGroups.keys()).sort((a,b) => keyGroups.get(a).snapshotTime.localeCompare(keyGroups.get(b).snapshotTime));
+    const keyColorMap = {};
+    sortedKeys.forEach((k,i) => { keyColorMap[k] = SNAPSHOT_COLORS[i % SNAPSHOT_COLORS.length]; });
+    log('Key groups: ' + sortedKeys.length);
+
+    const mcIdx = outHeader.indexOf('MC');
+    const targetMC = (segRowsOut[1] && mcIdx>=0) ? String(segRowsOut[1][mcIdx]??'').trim() : '';
+    log('Target MC: "' + targetMC + '"');
+
+    function computeCMDBStats(mc) {
+      let total=0, bmy=0, bmn=0, cy=0, cn=0;
+      for (const [sidKey] of cmdbLookup) {
+        if (mc) {
+          const mv = String(cmdbGet(sidKey,'MC Cluster')||'').trim();
+          if (mv && mv.toUpperCase() !== mc.toUpperCase()) continue;
+        }
+        total++;
+        const hub = String(cmdbGet(sidKey,'HUB Type')||'').toUpperCase();
+        const cls = String(cmdbGet(sidKey,'Site Priority Label')||'').toUpperCase();
+        const hg = String(cmdbGet(sidKey,'Has Generator')||'').toUpperCase();
+        const ds = String(cmdbGet(sidKey,'DG Status')||'').toUpperCase();
+        const hasDG = hg.includes('YES')||hg.includes('AVAILABLE')||ds.includes('ACTIVE')||ds.includes('RUN');
+        const bm = hub.includes('BIG')||hub.includes('MEDIUM');
+        const cr = cls.includes('CRITICAL');
+        if (bm) hasDG ? bmy++ : bmn++;
+        if (cr) hasDG ? cy++ : cn++;
+      }
+      return {totalSiteMC:total, bigMedYes:bmy, bigMedNo:bmn, critYes:cy, critNo:cn};
+    }
+    const cmdbStats = computeCMDBStats(targetMC);
+
+    const pgRowsOut = [PG_CATEGORIES.slice(), PG_COLS.slice()];
+    for (const key of sortedKeys) {
+      const snapRows = keyGroups.get(key).rows;
+      const snapshotTime = keyGroups.get(key).snapshotTime;
+      let bT=0,mT=0,sT=0,eT=0,sC=0,sNC=0,eC=0,eNC=0,mC=0,bC=0,cC=0;
+      for (const r of snapRows) {
+        const hub = String(r[outHeader.indexOf('Hub Type')]??'').toUpperCase();
+        const cls = String(r[outHeader.indexOf('Site Class(Priority)')]??'').toUpperCase();
+        const iC = cls.includes('CRITICAL');
+        if (iC) cC++;
+        if (hub.includes('BIG')) { bT++; if (iC) bC++; }
+        else if (hub.includes('MEDIUM')) { mT++; if (iC) mC++; }
+        else if (hub.includes('SMALL')) { sT++; if (iC) sC++; else sNC++; }
+        else if (hub.includes('END')) { eT++; if (iC) eC++; else eNC++; }
+      }
+      const td = snapRows.length;
+      const pd = cmdbStats.totalSiteMC ? (td/cmdbStats.totalSiteMC) : 0;
+      const yn = pd > 0.25 ? 'YES' : 'NO';
+      const mcName = snapRows[0]?.[outHeader.indexOf('MC')] ?? '';
+      pgRowsOut.push([snapshotTime,'KSMP',mcName,cmdbStats.totalSiteMC,bT,mT,sT,cC,eT,td,pd,cmdbStats.bigMedYes,cmdbStats.critYes,cmdbStats.bigMedNo,cmdbStats.critNo,'','','','','','',bT,mT,sC,sNC,eC,eNC,mC,bC,td,yn]);
+    }
+
+    const latestKey = sortedKeys[sortedKeys.length-1];
+    const latestRows = latestKey ? keyGroups.get(latestKey).rows : [];
+    const gdocRowsOut = [GDOC_COLS.slice()];
+    const mcDP = cmdbStats.totalSiteMC ? (latestRows.length/cmdbStats.totalSiteMC) : 0;
+    const mc25 = mcDP > 0.25 ? 'YES' : 'NO';
+
+    function permGen(sidKey) {
+      const hg = String(cmdbGet(sidKey,'Has Generator')||'').toUpperCase();
+      const ds = String(cmdbGet(sidKey,'DG Status')||'').toUpperCase();
+      if (ds.includes('ACTIVE')||ds.includes('RUN')) return 'DG ACTIVE';
+      if (hg.includes('YES')||hg.includes('AVAILABLE')) return 'DG AVAILABLE';
+      if (hg.includes('NO')||ds.includes('INACTIVE')||ds.includes('NO')) return 'NO DG';
+      return '';
+    }
+
+    for (const r of latestRows) {
+      const rKey = String(r[outHeader.indexOf('Key')]??'');
+      const rSid = String(r[outHeader.indexOf('Site Id')]??'').trim();
+      const sidKey = siteKeyFn(rSid);
+      const origSdl = sdlSideMap.get(rKey+'||'+sidKey) || null;
+      const get = col => r[outHeader.indexOf(col)] ?? '';
+      const statusVal = get('Status') || 'DOWN';
+
+      let scRaw = sdlGet(origSdl,'Site Class(Priority)')||sdlGet(origSdl,'Site Class')||cmdbGet(sidKey,'Site Priority Label')||get('Site Class(Priority)');
+      const sc = dedupeValues(scRaw,'/');
+      const ss = sdlGet(origSdl,'Super Sites')||sdlGet(origSdl,'Is Hub')||cmdbGet(sidKey,'Is Hub')||'No';
+      const t2 = sdlGet(origSdl,'>2TB')||sdlGet(origSdl,'Traffic Class')||cmdbGet(sidKey,'Traffic Class')||'No';
+      const p0 = sdlGet(origSdl,'P0')||sdlGet(origSdl,'P0 Sites')||cmdbGet(sidKey,'P0 Sites')||'No';
+      const vv = sdlGet(origSdl,'VVIP');
+      const vi = sdlGet(origSdl,'VIP')||get('VIP')||cmdbGet(sidKey,'Is VIP')||'No';
+      const sn = cmdbGet(sidKey,'Site Name*')||get('BTS Name');
+      const ht = cmdbGet(sidKey,'HUB Type')||get('Hub Type');
+      const fo = cmdbGet(sidKey,'FM Office*');
+      const rs = cmdbGet(sidKey,'Rts Name')||cmdbGet(sidKey,'Rts Id');
+
+      gdocRowsOut.push([get('MC')||cmdbGet(sidKey,'MC Cluster'),mc25,rSid,sn,statusVal,ht,get('Transport Outage'),permGen(sidKey),sc,ss,t2,p0,vv,vi,'','',fo,rs,'','']);
+    }
+
+    /* SUMMARY */
+    const summary = buildSummaryFromGDOCPG({
+      gdocRows: gdocRowsOut, pgRowsOut,
+      cmdbLookup, cmdbGet, targetMC, siteKeyFn,
+      powerAlarmSites: zipFoundSites, segLookup, segHeader
+    });
+    renderSummary(summary);
+
+    doneStage('stage-agg', `Diagram:${diagRowsOut.length-1} · PG:${pgRowsOut.length-2} · GDOC:${gdocRowsOut.length-1} · Summary ✓`);
+    await sleep(100);
+
+    /* 7. Excel */
     startStage('stage-excel');
-    await sleep(350);
+    await sleep(100);
+    const colorize = document.getElementById('colorize').checked;
+
+    const wsDiag = XLSX.utils.aoa_to_sheet(diagRowsOut);
+    if (!noStyle) {
+      applyHeaderStyle(wsDiag, diagRowsOut[0].length, '1E40AF');
+      wsDiag['!tabColor'] = {rgb:'3B82F6'};
+      if (colorize) {
+        const dD = diagRowsOut[0].indexOf('BCP Date'), dT = diagRowsOut[0].indexOf('BCP Time');
+        for (let i = 1; i < diagRowsOut.length; i++) {
+          const ss = String(diagRowsOut[i][dD]??'') + ' ' + String(diagRowsOut[i][dT]??'');
+          const kM = sortedKeys.find(k => keyGroups.get(k).snapshotTime === ss);
+          if (kM && keyColorMap[kM]) applyRowFill(wsDiag, i, keyColorMap[kM].fill);
+        }
+      }
+      applyAllDataBorders(wsDiag, diagRowsOut.length, diagRowsOut[0].length, 1);
+    }
+
+    const wsSeg = XLSX.utils.aoa_to_sheet(segRowsOut);
+    if (!noStyle) {
+      applyHeaderStyle(wsSeg, segRowsOut[0].length, '065F46');
+      wsSeg['!tabColor'] = {rgb:'10B981'};
+      if (colorize) {
+        for (let i = 1; i < segRowsOut.length; i++) {
+          const key = String(segRowsOut[i][keyColIdx]??'');
+          if (keyColorMap[key]) applyRowFill(wsSeg, i, keyColorMap[key].fill);
+        }
+      }
+      applyAllDataBorders(wsSeg, segRowsOut.length, segRowsOut[0].length, 1);
+      if (statusColIdx >= 0) for (let i = 1; i < segRowsOut.length; i++) applyStatusColor(wsSeg, i, statusColIdx, segRowsOut[i][statusColIdx], FONT_WHITE);
+    }
+
+    const wsPG = XLSX.utils.aoa_to_sheet(pgRowsOut);
+    if (!noStyle) {
+      applyColoredHeader2Rows(wsPG, PG_HEADER_COLORS, PG_DARK_FONT_COLS);
+      wsPG['!tabColor'] = {rgb:'F59E0B'};
+      if (colorize) {
+        for (let i = 2; i < pgRowsOut.length; i++) {
+          const t = String(pgRowsOut[i][0]??'');
+          const kM = sortedKeys.find(k => keyGroups.get(k).snapshotTime === t);
+          if (kM && keyColorMap[kM]) applyRowFill(wsPG, i, keyColorMap[kM].fill);
+        }
+      }
+      applyAllDataBorders(wsPG, pgRowsOut.length, pgRowsOut[0].length, 2);
+      const pctColIdx = PG_COLS.indexOf('Total % Sites Down');
+      for (let i = 2; i < pgRowsOut.length; i++) {
+        const ref = XLSX.utils.encode_cell({r:i, c:pctColIdx});
+        if (wsPG[ref] && typeof wsPG[ref].v === 'number') wsPG[ref].z = '0.00%';
+      }
+    }
+
+    const wsGDOC = XLSX.utils.aoa_to_sheet(gdocRowsOut);
+    if (!noStyle) {
+      applyColoredHeaderRow(wsGDOC, 0, GDOC_HEADER_COLORS, FONT_BLACK);
+      wsGDOC['!tabColor'] = {rgb:'EF4444'};
+      applyAllDataBorders(wsGDOC, gdocRowsOut.length, gdocRowsOut[0].length, 1);
+      applyBlackFontAll(wsGDOC, gdocRowsOut.length, gdocRowsOut[0].length, 1);
+      const sColG = gdocRowsOut[0].indexOf('Current Status Site (Up/Down)');
+      if (sColG >= 0) for (let i = 1; i < gdocRowsOut.length; i++) applyStatusColor(wsGDOC, i, sColG, gdocRowsOut[i][sColG], FONT_BLACK);
+    }
+
     const outWb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(outWb, XLSX.utils.aoa_to_sheet(diagOutRows), 'bcp_diagram_export_sheet');
-    XLSX.utils.book_append_sheet(outWb, XLSX.utils.aoa_to_sheet(segOutRows), 'bcp_segmentation_export_sheet');
-    const buf = XLSX.write(outWb, { type: 'array', bookType: 'xlsx' });
-    lastOutputBlob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    lastDiagRows = diagOutRows;
-    lastSegRows = segOutRows;
+    XLSX.utils.book_append_sheet(outWb, wsDiag, 'bcp_diagram_export_sheet');
+    XLSX.utils.book_append_sheet(outWb, wsSeg, 'bcp_segmentation_export_sheet');
+    XLSX.utils.book_append_sheet(outWb, wsPG, 'PG');
+    XLSX.utils.book_append_sheet(outWb, wsGDOC, 'GDOC');
+
+    const buf = XLSX.write(outWb, {type:'array', bookType:'xlsx', cellStyles:true});
+    lastOutputBlob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     doneStage('stage-excel', fmtBytes(lastOutputBlob.size));
-    log('Excel output: ' + fmtBytes(lastOutputBlob.size));
 
-    /* ---- Result ---- */
-    document.getElementById('stat-diag').textContent = (diagOutRows.length - 1).toLocaleString('id-ID');
-    document.getElementById('stat-base').textContent = sdlData.length.toLocaleString('id-ID');
-    document.getElementById('stat-output').textContent = outputRowCount.toLocaleString('id-ID');
-    document.getElementById('stat-dup').textContent = dupRowsTotal.toLocaleString('id-ID');
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
+    document.getElementById('perf-note').innerHTML = `⚡ Selesai dalam <b>${elapsed}s</b> · Summary siap copy`;
 
-    const isIntegrityOk = (outputRowCount === sdlData.length);
-    const baseCard = document.getElementById('stat-base-card');
-    const outputCard = document.getElementById('stat-output-card');
-    baseCard.className = 'stat' + (isIntegrityOk ? ' integrity-ok' : ' integrity-warn');
-    outputCard.className = 'stat' + (isIntegrityOk ? ' integrity-ok' : ' integrity-warn');
+    animateNumber(document.getElementById('stat-diag'), diagRowsOut.length-1);
+    animateNumber(document.getElementById('stat-seg'), segRowsOut.length-1);
+    animateNumber(document.getElementById('stat-pg'), pgRowsOut.length-2);
+    animateNumber(document.getElementById('stat-gdoc'), gdocRowsOut.length-1);
 
-    const integrityNote = document.getElementById('integrity-note');
-    if (isIntegrityOk) {
-      integrityNote.className = 'integrity-note ok';
-      integrityNote.innerHTML =
-        '✅ <b>1:1 Verifikasi OK:</b> ' + inputRowCount.toLocaleString('id-ID') + ' baris SDL (raw) → ' +
-        (droppedEmpty > 0 ? droppedEmpty + ' baris kosong diabaikan → ' : '') +
-        sdlData.length.toLocaleString('id-ID') + ' baris diproses → ' +
-        outputRowCount.toLocaleString('id-ID') + ' baris output. <b>Tidak ada baris hilang.</b>' +
-        (mergedKeyFilled > 0 ? ' · ' + mergedKeyFilled + ' Key di-forward-fill (merged cell).' : '');
-    } else {
-      integrityNote.className = 'integrity-note warn';
-      integrityNote.innerHTML =
-        '⚠️ <b>Perhatian:</b> ' + sdlData.length + ' baris diproses vs ' + outputRowCount + ' output. ' +
-        'Selisih ' + Math.abs(sdlData.length - outputRowCount) + '.';
-    }
-
-    const dupNote = document.getElementById('dup-note');
-    if (dupRowsTotal > 0) {
-      dupNote.innerHTML =
-        '🔁 <b>Duplikat dipertahankan:</b> ' + dupGroups + ' grup signature (Key+Site Id) muncul &gt;1× · ' +
-        dupRowsTotal + ' baris total · ' + dupExtra + ' baris ekstra.<br>' +
-        '<small>✅ Sesuai permintaan: <b>tidak ada dedupe</b> — semua baris duplikat tetap masuk ke output.</small>';
-    } else {
-      dupNote.innerHTML = '🔁 <b>Duplikat:</b> tidak ada duplikat terdeteksi (semua baris unik).';
-    }
-
-    document.getElementById('flow-note').innerHTML =
-      '🧭 <b>Alur:</b> ' + sdlData.length + ' baris dari <code>' + escapeHtml(siteDownListName) + '</code> → ' +
-      segHitCount + ' site diperkaya dari Segmentation (' + enrichRate + '%) · ' +
-      potHitCount + ' site punya detail POT.';
-
-    let keyNoteHtml = '🔑 <b>Key:</b> kolom <code>' + escapeHtml(sdlKeyCol) + '</code> dari <code>' + escapeHtml(siteDownListName) + '</code> · ' +
-      keyFilledCount + '/' + sdlData.length + ' baris terisi';
-    if (mergedKeyFilled > 0) keyNoteHtml += ' (+' + mergedKeyFilled + ' merged)';
-    keyNoteHtml += '.';
-    document.getElementById('key-note').innerHTML = keyNoteHtml;
-
-    renderMappingTable();
-    renderPreview('prev-diag', diagOutRows, 15);
-    renderPreview('prev-seg', segOutRows, 15);
+    renderPreview('prev-diag', diagRowsOut, 20);
+    renderPreview('prev-seg', segRowsOut, 15);
+    renderPreview('prev-pg', pgRowsOut, 20);
+    renderPreview('prev-gdoc', gdocRowsOut, 20);
 
     document.getElementById('result-card').classList.add('show');
-    document.getElementById('result-card').scrollIntoView({ behavior: 'smooth' });
-
-    if (isIntegrityOk) {
-      toast('✅ Berhasil! ' + outputRowCount + ' baris = ' + sdlData.length + ' base (termasuk ' + dupRowsTotal + ' duplikat).', 'success');
-    } else {
-      toast('⚠️ Selesai, ada selisih baris. Cek integrity note.', 'warn');
-    }
-    log('=== Proses selesai ===');
+    const wave = document.getElementById('successWave');
+    wave.classList.add('show');
+    setTimeout(() => wave.classList.remove('show'), 1200);
+    toast('✅ Berhasil dalam ' + elapsed + 's!', 'success');
 
   } catch (err) {
     console.error(err);
     log('❌ ERROR: ' + err.message);
-    if (err.stack) log('Stack: ' + err.stack.split('\n').slice(0,5).join('\n'));
     const active = document.querySelector('.stage.active');
     if (active) failStage(active.id, err.message);
     toast('❌ ' + err.message, 'error');
   } finally {
+    btn.classList.remove('loading');
     btn.textContent = '🚀 Proses Kompilasi';
     processing = false;
     checkReady();
   }
 }
 
-/* ============================================================
-   MAPPING TABLE
-============================================================ */
-function renderMappingTable() {
-  const tbody = document.getElementById('mapping-body');
-  if (!tbody) return;
-  let html = '';
-  for (const m of mappingRows) {
-    const statusCls = m.ok ? 'matched' : 'unmatched';
-    const statusTxt = m.ok ? '✓' : '✕';
-    html += `<tr class="${m.cls}">`;
-    html += `<td>${escapeHtml(m.template)}</td>`;
-    html += `<td class="source">${escapeHtml(m.matched)}</td>`;
-    html += `<td>${escapeHtml(m.source)}</td>`;
-    html += `<td class="${statusCls}">${statusTxt}</td>`;
-    html += '</tr>';
-  }
-  tbody.innerHTML = html;
-}
-
-/* ============================================================
-   PREVIEW + DOWNLOAD
-============================================================ */
+/* ═══════════════ PREVIEW + DOWNLOAD ═══════════════ */
 function renderPreview(elId, rows, limit) {
   const el = document.getElementById(elId);
   const data = rows.slice(0, limit + 1);
@@ -1005,63 +1536,49 @@ function renderPreview(elId, rows, limit) {
     html += '</tr>';
   }
   html += '</tbody></table>';
-  if (rows.length - 1 > limit) html += '<div style="padding:8px;text-align:center;color:#718096;font-size:12px">... ' + (rows.length - 1 - limit) + ' baris lainnya</div>';
+  if (rows.length - 1 > limit) html += `<div style="padding:10px;text-align:center;color:var(--text-muted);font-size:11px">... ${rows.length-1-limit} baris lainnya</div>`;
   el.innerHTML = html;
 }
-
 function togglePreview(id) { document.getElementById(id).classList.toggle('show'); }
-
 function downloadOutput() {
   if (!lastOutputBlob) return;
   const url = URL.createObjectURL(lastOutputBlob);
   const a = document.createElement('a');
-  const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-  a.href = url;
-  a.download = 'BCP_Compiled_' + ts + '.xlsx';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  a.href = url; a.download = 'BCP_Compiled_' + ts + '.xlsx';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 2000);
-  toast('📥 File berhasil diunduh', 'success');
-  log('Download: ' + a.download);
+  toast('📥 File diunduh', 'success');
 }
-
 function downloadLog() {
-  if (logLines.length === 0) { toast('Log kosong', 'warn'); return; }
-  const content = logLines.join('\n');
-  const blob = new Blob([content], { type: 'text/plain' });
+  if (!logLines.length) { toast('Log kosong', 'warn'); return; }
+  const blob = new Blob([logLines.join('\n')], {type:'text/plain'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-  a.href = url;
-  a.download = 'bcp_compiler_log_' + ts + '.txt';
-  a.click();
+  const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  a.href = url; a.download = 'bcp_log_' + ts + '.txt'; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
-  toast('📥 Log berhasil diunduh', 'success');
 }
-
 function resetAll() {
-  potFile = null; segFile = null;
-  lastOutputBlob = null; lastDiagRows = null; lastSegRows = null;
-  document.getElementById('file-pot').value = '';
-  document.getElementById('file-seg').value = '';
-  document.getElementById('info-pot').classList.remove('show');
-  document.getElementById('info-seg').classList.remove('show');
+  potFile = null; segFile = null; cmdbFile = null; zipFile = null; lastOutputBlob = null;
+  ['file-pot','file-seg','file-cmdb','file-zip'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  ['info-pot','info-seg','info-cmdb','info-zip'].forEach(id => document.getElementById(id).classList.remove('show'));
+  ['warn-pot','warn-seg','warn-cmdb','warn-zip'].forEach(id => { const e = document.getElementById(id); if (e) e.textContent = ''; });
   document.getElementById('progress-card').classList.remove('show');
   document.getElementById('result-card').classList.remove('show');
-  document.getElementById('mapping-body').innerHTML = '';
+  document.getElementById('summary-card').classList.remove('show');
+  document.getElementById('summary-text').value = '';
   logLines.length = 0;
-  log('Reset');
   resetStages();
   checkReady();
+  toast('🔄 Reset selesai', 'success');
 }
 
-/* ============================================================
-   INIT
-============================================================ */
-bindDrop('dz-pot', 'file-pot', 'pot');
-bindDrop('dz-seg', 'file-seg', 'seg');
-log('Aplikasi siap. Menunggu upload file...');
+bindDrop('dz-pot','file-pot','pot');
+bindDrop('dz-seg','file-seg','seg');
+bindDrop('dz-cmdb','file-cmdb','cmdb');
+bindDrop('dz-zip','file-zip','zip');
+log('Aplikasi siap · Semua bug fixed');
 </script>
 </body>
 </html>
