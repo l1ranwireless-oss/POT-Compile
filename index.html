@@ -1832,23 +1832,14 @@ async function process() {
       pgRowsOut.push([snapshotTime,'KSMP',mcName,cmdbStats.totalSiteMC,bT,mT,sT,cC,eT,td,pd,cmdbStats.bigMedYes,cmdbStats.critYes,cmdbStats.bigMedNo,cmdbStats.critNo,'','','','','','',bT,mT,sC,sNC,eC,eNC,mC,bC,td,yn]);
     }
 
-    const latestKey = sortedKeys[sortedKeys.length-1];
-    const latestRows = latestKey ? keyGroups.get(latestKey).rows : [];
     const gdocSites = new Map();
-    for (let i = 0; i < sdlData.length; i++) {
-      const sourceRow = sdlData[i];
-      const sidKey = siteKeyFn(sourceRow[sdlSiteIdx]);
+    for (const segRow of segRowsOut.slice(1)) {
+      const sidKey = siteKeyFn(segRow[siteColIdx]);
       if (!sidKey) continue;
-      const key = String(sourceRow[sdlKeyIdx] ?? '');
-      const keyTime = key.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/);
-      const snapshotTime = keyTime ? `${keyTime[1]} ${keyTime[2]}` : key;
-      const previous = gdocSites.get(sidKey);
-      if (!previous || snapshotTime.localeCompare(previous.snapshotTime) >= 0) {
+      if (!gdocSites.has(sidKey)) {
         gdocSites.set(sidKey, {
-          row: sourceRow,
-          key,
-          snapshotTime,
-          status: statusByRow[i] || 'UP'
+          row: segRow,
+          status: String(segRow[statusColIdx] ?? '').trim()
         });
       }
     }
@@ -1867,26 +1858,32 @@ async function process() {
     }
 
     for (const [sidKey, site] of gdocSites) {
-      const origSdl = site.row;
-      const rSid = String(origSdl[sdlSiteIdx] ?? '').trim();
+      const segRow = site.row;
+      const rSid = String(segRow[siteColIdx] ?? '').trim();
       const statusVal = site.status;
+      const get = column => {
+        const idx = outHeader.indexOf(column);
+        return idx >= 0 ? segRow[idx] ?? '' : '';
+      };
+      const key = String(get('Key') ?? '');
+      const origSdl = sdlSideMap.get(key+'||'+sidKey) || null;
       const segValue = column => {
         const idx = segColMap[column];
         return idx === undefined ? '' : aggValue(sidKey, idx);
       };
-      const mcArea = sdlGet(origSdl,'MC')||segValue('MC')||cmdbGet(sidKey,'MC Cluster');
-      let scRaw = sdlGet(origSdl,'Site Class(Priority)')||sdlGet(origSdl,'Site Class')||segValue('Site Class(Priority)')||cmdbGet(sidKey,'Site Priority Label');
+      const mcArea = get('MC')||sdlGet(origSdl,'MC')||segValue('MC')||cmdbGet(sidKey,'MC Cluster');
+      let scRaw = get('Site Class(Priority)')||sdlGet(origSdl,'Site Class(Priority)')||sdlGet(origSdl,'Site Class')||segValue('Site Class(Priority)')||cmdbGet(sidKey,'Site Priority Label');
       const sc = dedupeValues(scRaw,'/');
-      const ss = sdlGet(origSdl,'Super Sites')||sdlGet(origSdl,'Is Hub')||segValue('Super Sites')||cmdbGet(sidKey,'Is Hub')||'No';
-      const t2 = sdlGet(origSdl,'>2TB')||sdlGet(origSdl,'Traffic Class')||segValue('>2TB')||cmdbGet(sidKey,'Traffic Class')||'No';
-      const p0 = sdlGet(origSdl,'P0')||sdlGet(origSdl,'P0 Sites')||segValue('P0')||cmdbGet(sidKey,'P0 Sites')||'No';
-      const vv = sdlGet(origSdl,'VVIP')||segValue('VVIP');
-      const vi = sdlGet(origSdl,'VIP')||segValue('VIP')||cmdbGet(sidKey,'Is VIP')||'No';
-      const sn = sdlGet(origSdl,'Site Name')||segValue('BTS Name')||cmdbGet(sidKey,'Site Name*');
-      const ht = sdlGet(origSdl,'Hub Type')||segValue('Hub Type')||cmdbGet(sidKey,'HUB Type');
+      const ss = get('Super Sites')||sdlGet(origSdl,'Super Sites')||sdlGet(origSdl,'Is Hub')||segValue('Super Sites')||cmdbGet(sidKey,'Is Hub')||'No';
+      const t2 = get('>2TB')||sdlGet(origSdl,'>2TB')||sdlGet(origSdl,'Traffic Class')||segValue('>2TB')||cmdbGet(sidKey,'Traffic Class')||'No';
+      const p0 = get('P0')||sdlGet(origSdl,'P0')||sdlGet(origSdl,'P0 Sites')||segValue('P0')||cmdbGet(sidKey,'P0 Sites')||'No';
+      const vv = get('VVIP')||sdlGet(origSdl,'VVIP')||segValue('VVIP');
+      const vi = get('VIP')||sdlGet(origSdl,'VIP')||segValue('VIP')||cmdbGet(sidKey,'Is VIP')||'No';
+      const sn = get('BTS Name')||sdlGet(origSdl,'Site Name')||segValue('BTS Name')||cmdbGet(sidKey,'Site Name*');
+      const ht = get('Hub Type')||sdlGet(origSdl,'Hub Type')||segValue('Hub Type')||cmdbGet(sidKey,'HUB Type');
       const fo = cmdbGet(sidKey,'FM Office*');
       const rs = cmdbGet(sidKey,'Rts Name')||cmdbGet(sidKey,'Rts Id');
-      const transport = sdlGet(origSdl,'Transport Outage')||segValue('Transport Outage');
+      const transport = get('Transport Outage')||sdlGet(origSdl,'Transport Outage')||segValue('Transport Outage');
       gdocRowsOut.push([mcArea,mc25,rSid,sn,statusVal,ht,transport,permGen(sidKey),sc,ss,t2,p0,vv,vi,'','',fo,rs,'','']);
     }
 
