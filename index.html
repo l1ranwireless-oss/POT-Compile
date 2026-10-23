@@ -814,11 +814,11 @@ function findBestMCMatch(targetMC) {
   const tn = normMCKey(targetMC);
   if (!tn) return null;
   if (CMDB_CACHE.statsByMC.has(tn)) return tn;
-  for (const [key] of CMDB_CACHE.statsByMC) {
-    if (!key) continue;
-    if (key.includes(tn) || tn.includes(key)) return key;
-  }
-  return null;
+  const matches = Array.from(CMDB_CACHE.statsByMC.keys())
+    .filter(key => key && (key.includes(tn) || tn.includes(key)))
+    .sort((a, b) => b.length - a.length);
+  if (!matches.length || (matches.length > 1 && matches[0].length === matches[1].length)) return null;
+  return matches[0];
 }
 
 /* ═══════════════ CHUNKED CMDB LOADING ═══════════════ */
@@ -1343,7 +1343,7 @@ function buildSummaryFromGDOCPG(params) {
     downSites.push({
       sid, nid,
       name: String(r[GDOC_IDX.SITE_NAME] || '').trim() || sid,
-      mcArea: String(r[GDOC_IDX.MC_AREA] || '').trim(),
+      mcArea: String(cmdbGet(nid, 'MC Cluster') || r[GDOC_IDX.MC_AREA] || '').trim(),
       hubType: String(r[GDOC_IDX.HUB_TYPE] || '').trim(),
       transport: String(r[GDOC_IDX.TRANSPORT] || '').trim(),
       gdocGenset: String(r[GDOC_IDX.GENSET] || '').trim(),
@@ -1355,42 +1355,66 @@ function buildSummaryFromGDOCPG(params) {
     });
   }
   
+  const impactedMCStats = new Map();
+  const unmatchedMCs = new Set();
+  for (const site of downSites) {
+    const mcKey = findBestMCMatch(site.mcArea);
+    if (!mcKey) {
+      if (site.mcArea) unmatchedMCs.add(site.mcArea);
+      continue;
+    }
+    const stats = CMDB_CACHE.statsByMC.get(mcKey);
+    if (stats) impactedMCStats.set(mcKey, stats);
+  }
+  if (!impactedMCStats.size && !unmatchedMCs.size && targetMC) {
+    const mcKey = findBestMCMatch(targetMC);
+    const stats = mcKey ? CMDB_CACHE.statsByMC.get(mcKey) : null;
+    if (stats) impactedMCStats.set(mcKey, stats);
+  }
+  if (unmatchedMCs.size) log(`⚠️ MC Cluster tidak ditemukan di CMDB: ${Array.from(unmatchedMCs).join(', ')}`);
+  const mcLabels = [
+    ...Array.from(impactedMCStats.values(), stats => stats.displayName),
+    ...Array.from(unmatchedMCs)
+  ];
+  const hasMultipleImpactedMCs = impactedMCStats.size + unmatchedMCs.size > 1;
+  const mcLabel = mcLabels.length ? mcLabels.join(', ') : (targetMC || '-');
+
   /* Power Alarm cross-ref */
-  let powerAlarmCount = 0, powerAlarmMcCount = 0;
+  let powerAlarmCount = 0;
+  const powerAlarmByMC = new Map();
   if (powerAlarmSites && powerAlarmSites.size > 0) {
-    for (const s of downSites) {
-      if (powerAlarmSites.has(s.nid)) {
-        powerAlarmCount++;
-        if (!targetMC || (s.mcArea || '').toUpperCase() === targetMC.toUpperCase()) powerAlarmMcCount++;
-      }
+    for (const site of downSites) {
+      if (!powerAlarmSites.has(site.nid)) continue;
+      powerAlarmCount++;
+      const mcKey = findBestMCMatch(site.mcArea);
+      const label = mcKey
+        ? (CMDB_CACHE.statsByMC.get(mcKey)?.displayName || site.mcArea || 'MC tidak diketahui')
+        : (site.mcArea || 'MC tidak diketahui');
+      powerAlarmByMC.set(label, (powerAlarmByMC.get(label) || 0) + 1);
     }
   }
+  const powerAlarmMcCount = powerAlarmCount;
   
-  /* ═══ NEW: totalDown dari Summary Report, totalSiteMC dari CMDB ═══ */
-  const sdr = extractSummaryReportValues(summaryRows, targetMC);
-  let totalDown, totalDownSource;
-  if (sdr.totalDown !== null && sdr.matched > 0) {
+  /* Aggregate incident counts across all impacted MC Clusters. */
+  const sdr = hasMultipleImpactedMCs ? null : extractSummaryReportValues(summaryRows, mcLabel);
+  let totalDown = downSites.length;
+  let totalDownSource = 'GDOC';
+  if (sdr && sdr.totalDown !== null && sdr.matched > 0) {
     totalDown = sdr.totalDown;
     totalDownSource = 'Summary Report';
-  } else {
-    totalDown = downSites.length;
-    totalDownSource = 'GDOC fallback';
-    if (sdr.totalDown === null) log(`⚠️ Summary Report tidak match MC "${targetMC}" — fallback ke GDOC count (${totalDown})`);
+  } else if (sdr && sdr.totalDown === null) {
+    log(`⚠️ Summary Report tidak match MC "${mcLabel}" — fallback ke GDOC count (${totalDown})`);
   }
   
   let totalSiteMC = 0;
-  const mcKey = findBestMCMatch(targetMC);
-  if (mcKey) {
-    const stats = CMDB_CACHE.statsByMC.get(mcKey);
-    if (stats) totalSiteMC = stats.total || 0;
-  }
+  for (const stats of impactedMCStats.values()) totalSiteMC += stats.total || 0;
   if (totalSiteMC === 0) {
     totalSiteMC = CMDB_CACHE.globalStats?.total || 0;
-    if (totalSiteMC > 0) log(`⚠️ CMDB MC "${targetMC}" tidak match — pakai global total ${totalSiteMC}`);
+    if (totalSiteMC > 0) log(`⚠️ CMDB MC "${mcLabel}" tidak match — pakai global total ${totalSiteMC}`);
   }
   
   const pctDown = totalSiteMC > 0 ? (totalDown / totalSiteMC) * 100 : 0;
-  log(`📊 Summary: Down=${totalDown} (${totalDownSource}) · TotalMC=${totalSiteMC} (CMDB) · ${pctDown.toFixed(2)}%`);
+  log(`📊 Summary: Down=${totalDown} (${totalDownSource}) · TotalMC=${totalSiteMC} (CMDB ${mcLabel}) · ${pctDown.toFixed(2)}%`);
   
   /* Categories */
   function categorize(site) {
@@ -1428,7 +1452,13 @@ function buildSummaryFromGDOCPG(params) {
     const sitesDown = downSites.filter(s => categorize(s).includes(cat.key));
     const down = sitesDown.length;
     let total = 0;
-    if (cat.format === 'pct') total = getHubTotalByMC(targetMC, cat.key);
+    if (cat.format === 'pct') {
+      for (const stats of impactedMCStats.values()) {
+        if (cat.key === 'big') total += stats.big || 0;
+        else if (cat.key === 'medium') total += stats.medium || 0;
+      }
+      if (impactedMCStats.size === 0) total = getHubTotalByMC(targetMC, cat.key);
+    }
     let siteList = [];
     if (cat.showSites) {
       siteList = sitesDown.map(s => ({ name: s.name || s.sid, transport: s.transport || '', genset: deriveGensetLabel(s.nid, s.gdocGenset, segLookup, segHeader) }));
@@ -1443,10 +1473,8 @@ function buildSummaryFromGDOCPG(params) {
   const mcUnique = new Map();
   for (const [k, stats] of CMDB_CACHE.statsByMC) mcUnique.set(k, { displayName: stats.displayName, down: 0, total: stats.total || 0 });
   for (const s of downSites) {
-    const mcRaw = (s.mcArea || '').trim();
-    if (!mcRaw) continue;
-    const k = normMCKey(mcRaw);
-    if (mcUnique.has(k)) mcUnique.get(k).down++;
+    const k = findBestMCMatch(s.mcArea);
+    if (k && mcUnique.has(k)) mcUnique.get(k).down++;
   }
   if (mcUnique.size === 0 && targetMC) {
     const safeTotal = totalSiteMC > 0 ? totalSiteMC : Math.max(1, totalDown);
@@ -1463,8 +1491,8 @@ function buildSummaryFromGDOCPG(params) {
   
   return {
     agingStr, startTime, updateTime, totalDown, totalDownSource, totalSiteMC, pctDown,
-    powerAlarmCount, powerAlarmMcCount,
-    categoryResults, mcAbove25List, targetMC
+    powerAlarmCount, powerAlarmMcCount, powerAlarmByMC,
+    categoryResults, mcAbove25List, targetMC: mcLabel, impactedMCs: mcLabels
   };
 }
 
@@ -1478,9 +1506,14 @@ function generateSummaryText(summary) {
     lines.push(`Update Time: ${summary.updateTime || '-'}`);
     lines.push('');
     lines.push(`Sites down / total site under MC Impacted: ${summary.totalDown}/${summary.totalSiteMC} (${summary.pctDown.toFixed(2)}%)`);
-    lines.push(`Total Sites Down under ${summary.targetMC}: ${summary.totalDown} out of ${summary.totalSiteMC} (${summary.pctDown.toFixed(2)}%)`);
+    lines.push(`Total Sites Down under impacted MC Cluster (${summary.targetMC}): ${summary.totalDown} out of ${summary.totalSiteMC} (${summary.pctDown.toFixed(2)}%)`);
     lines.push(`Sites with Power Alarm: ${summary.powerAlarmCount}`);
-    lines.push(`${summary.targetMC} : ${summary.powerAlarmMcCount}`);
+    const alarmMCs = summary.impactedMCs || [];
+    if (alarmMCs.length) {
+      for (const mc of alarmMCs) lines.push(`${mc} : ${(summary.powerAlarmByMC && summary.powerAlarmByMC.get(mc)) || 0}`);
+    } else {
+      lines.push(`${summary.targetMC} : ${summary.powerAlarmMcCount}`);
+    }
     lines.push('');
     lines.push('Sites Down Priority : ');
     
