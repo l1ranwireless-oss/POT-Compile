@@ -13,14 +13,42 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
+  function ensureXLSX() {
+    if (window.XLSX) return Promise.resolve(true);
+    if (window.__xlsxLoadPromise) return window.__xlsxLoadPromise;
+    window.__xlsxLoadPromise = new Promise(resolve => {
+      const cdns = [
+        'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+        'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+      ];
+      let index = 0;
+      function tryNext() {
+        if (index >= cdns.length) {
+          window.__xlsxLoadPromise = null;
+          document.getElementById('cdn-warn')?.classList.add('show');
+          resolve(false);
+          return;
+        }
+        const script = document.createElement('script');
+        script.src = cdns[index++];
+        script.onload = () => {
+          if (window.XLSX) {
+            window.__xlsxNoStyle = true;
+            resolve(true);
+          } else {
+            tryNext();
+          }
+        };
+        script.onerror = tryNext;
+        document.head.appendChild(script);
+      }
+      tryNext();
+    });
+    return window.__xlsxLoadPromise;
+  }
   window.addEventListener('DOMContentLoaded', () => {
-    if (!window.XLSX) {
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
-      s.onload = () => { window.__xlsxNoStyle = true; };
-      s.onerror = () => document.getElementById('cdn-warn')?.classList.add('show');
-      document.head.appendChild(s);
-    }
+    if (!window.XLSX) ensureXLSX();
   });
 </script>
 <style>
@@ -462,7 +490,7 @@ const CMDB_DB_VERSION = 1;
 const CMDB_STORE_NAME = 'sources';
 const CMDB_CACHE = {
   chunks: [], index: new Map(), statsByMC: new Map(), globalStats: null,
-  meta: { rows:0, cols:0, chunks:0, processed:0, skipped:0, sites:0, mcCount:0, loadedAt:null, loadedAtISO:null, signature:null, sheetName:null, headerIdx:null, normalized:null, criticalMissing:[] }
+  meta: { rows:0, cols:0, chunks:0, processed:0, skipped:0, sites:0, mcCount:0, loadedAt:null, loadedAtISO:null, signature:null, sheetName:null, headerIdx:null, normalized:null, criticalMissing:[], sourceStored:false }
 };
 function emptyStats(displayName) {
   return { displayName: displayName || '', total:0, big:0, medium:0, small:0, end:0, bigMedDG:0, bigMedNoDG:0, critical:0, criticalDG:0, criticalNoDG:0 };
@@ -504,7 +532,7 @@ function clearCMDB(options = {}) {
   CMDB_CACHE.index.clear();
   CMDB_CACHE.statsByMC.clear();
   CMDB_CACHE.globalStats = emptyStats('ALL');
-  CMDB_CACHE.meta = { rows:0, cols:0, chunks:0, processed:0, skipped:0, sites:0, mcCount:0, loadedAt:null, loadedAtISO:null, signature:null, sheetName:null, headerIdx:null, normalized:null, criticalMissing:[] };
+  CMDB_CACHE.meta = { rows:0, cols:0, chunks:0, processed:0, skipped:0, sites:0, mcCount:0, loadedAt:null, loadedAtISO:null, signature:null, sheetName:null, headerIdx:null, normalized:null, criticalMissing:[], sourceStored:false };
   if (had > 0) log(`🗑️ CMDB cache cleared (was: ${had} sites)`);
   updateCMDBBadge();
   if (options.deleteStored) deleteCMDBSource().catch(e => toast('Database CMDB gagal dihapus: ' + e.message, 'error'));
@@ -521,7 +549,8 @@ function updateCMDBBadge() {
   } else {
     const cr = m.criticalMissing && m.criticalMissing.length ? ` ⚠️ ${m.criticalMissing.length} critical missing` : '';
     badge.className = 'cmdb-badge loaded';
-    badge.innerHTML = `🟢 <b>CMDB Database:</b> &quot;${escapeHtml(m.sheetName)}&quot; · ${m.sites.toLocaleString('id-ID')} sites · ${m.chunks} chunks · ${m.mcCount} MC · IndexedDB · header#${m.headerIdx}${cr} <button class="cache-clear-btn" onclick="clearCMDB({deleteStored:true})">🗑️ Clear</button>`;
+    const storage = m.sourceStored ? 'tersimpan di IndexedDB' : 'tersedia untuk sesi ini';
+    badge.innerHTML = `🟢 <b>CMDB Database:</b> &quot;${escapeHtml(m.sheetName)}&quot; · ${m.sites.toLocaleString('id-ID')} sites · ${m.chunks} chunks · ${m.mcCount} MC · ${storage} · header#${m.headerIdx}${cr} <button class="cache-clear-btn" onclick="clearCMDB({deleteStored:true})">🗑️ Clear</button>`;
   }
 }
 
@@ -610,7 +639,7 @@ async function deleteCMDBSource() {
   });
 }
 async function prepareCMDBDatabase(file) {
-  if (!window.XLSX) throw new Error('Library Excel belum siap');
+  if (!await ensureXLSX()) throw new Error('Library Excel gagal dimuat. Periksa koneksi internet.');
   const cmdbBuf = await file.arrayBuffer();
   const cmdbWb = XLSX.read(cmdbBuf, {type:'array', cellDates:false, cellNF:false, cellText:false});
   if (!cmdbWb.SheetNames.length) throw new Error('File CMDB tidak memiliki sheet');
@@ -643,8 +672,14 @@ async function prepareCMDBDatabase(file) {
   CMDB_CACHE.meta.processed = CMDB_CACHE.index.size;
   CMDB_CACHE.meta.loadedAt = new Date();
   CMDB_CACHE.meta.loadedAtISO = CMDB_CACHE.meta.loadedAt.toISOString();
-  await saveCMDBSource(file);
+  try {
+    await saveCMDBSource(file);
+    CMDB_CACHE.meta.sourceStored = true;
+  } catch (e) {
+    log('⚠️ CMDB siap untuk sesi ini, tetapi sumber gagal disimpan ke IndexedDB: ' + e.message);
+  }
   updateCMDBBadge();
+  return CMDB_CACHE.meta.sourceStored;
 }
 
 /* ═══════════════ BEST MC MATCH ═══════════════ */
@@ -1005,8 +1040,11 @@ function setFile(key, file) {
   log(`File ${key.toUpperCase()}: ${file.name}`);
   if (key === 'cmdb') {
     checkReady();
-    prepareCMDBDatabase(file).then(() => {
-      if (cmdbFile === file) toast(`✅ Database CMDB siap · ${CMDB_CACHE.meta.sites.toLocaleString('id-ID')} sites`, 'success');
+    prepareCMDBDatabase(file).then(sourceStored => {
+      if (cmdbFile === file) {
+        const persistenceMessage = sourceStored ? '' : ' · tidak tersimpan setelah refresh';
+        toast(`✅ Database CMDB siap · ${CMDB_CACHE.meta.sites.toLocaleString('id-ID')} sites${persistenceMessage}`, sourceStored ? 'success' : 'warn');
+      }
     }).catch(e => {
       if (cmdbFile === file) {
         cmdbFile = null;
@@ -1161,6 +1199,7 @@ function buildSummaryFromGDOCPG(params) {
   const gdocData = gdocRows.slice(1);
   const downSites = [];
   for (const r of gdocData) {
+    if (String(r[GDOC_IDX.STATUS] ?? '').trim().toUpperCase() !== 'DOWN') continue;
     const sid = String(r[GDOC_IDX.SITE_ID] || '').trim();
     if (!sid) continue;
     const nid = siteKeyFn(sid);
@@ -1629,6 +1668,20 @@ async function process() {
       return vals.join(',');
     }
 
+    function isBlankCell(value) {
+      return value == null || String(value).trim() === '';
+    }
+    function cmdbSegValue(column, sidKey) {
+      const key = norm(column);
+      if (key === norm('BTS Name') || key === norm('Site Name')) return cmdbGet(sidKey, 'Site Name*');
+      if (key === norm('Hub Type')) return cmdbGet(sidKey, 'HUB Type');
+      if (key === norm('Site Class(Priority)') || key === norm('Site Class')) return cmdbGet(sidKey, 'Site Priority Label');
+      if (key === norm('Genset')) return cmdbGet(sidKey, 'Has Generator') || cmdbGet(sidKey, 'DG Status');
+      if (key === norm('MC')) return cmdbGet(sidKey, 'MC Cluster');
+      if (key === norm('VIP')) return cmdbGet(sidKey, 'Is VIP');
+      return '';
+    }
+
     let outHeader;
     if (useDyn) {
       outHeader = sdlHeader.slice();
@@ -1690,6 +1743,16 @@ async function process() {
         rowOut.push(status);
         rowOut.push(recoveryNote);
       }
+      for (let col = 0; col < outHeader.length; col++) {
+        if (isBlankCell(rowOut[col])) {
+          if (norm(outHeader[col]) === norm('Impact Category')) {
+            rowOut[col] = 'Fully Site Down';
+          } else {
+            const fallback = cmdbSegValue(outHeader[col], sidKey);
+            if (!isBlankCell(fallback)) rowOut[col] = fallback;
+          }
+        }
+      }
       segRowsOut.push(rowOut);
     }
 
@@ -1749,9 +1812,10 @@ async function process() {
     const pgRowsOut = [PG_CATEGORIES.slice(), PG_COLS.slice()];
     for (const key of sortedKeys) {
       const snapRows = keyGroups.get(key).rows;
+      const downRows = snapRows.filter(r => String(r[statusColIdx] ?? '').trim().toUpperCase() === 'DOWN');
       const snapshotTime = keyGroups.get(key).snapshotTime;
       let bT=0,mT=0,sT=0,eT=0,sC=0,sNC=0,eC=0,eNC=0,mC=0,bC=0,cC=0;
-      for (const r of snapRows) {
+      for (const r of downRows) {
         const hub = String(r[outHeader.indexOf('Hub Type')]??'').toUpperCase();
         const cls = String(r[outHeader.indexOf('Site Class(Priority)')]??'').toUpperCase();
         const iC = cls.includes('CRITICAL');
@@ -1761,17 +1825,36 @@ async function process() {
         else if (hub.includes('SMALL')) { sT++; if (iC) sC++; else sNC++; }
         else if (hub.includes('END')) { eT++; if (iC) eC++; else eNC++; }
       }
-      const td = snapRows.length;
+      const td = downRows.length;
       const pd = cmdbStats.totalSiteMC ? (td/cmdbStats.totalSiteMC) : 0;
       const yn = pd > 0.25 ? 'YES' : 'NO';
-      const mcName = snapRows[0]?.[outHeader.indexOf('MC')] ?? '';
+      const mcName = (downRows[0] || snapRows[0])?.[outHeader.indexOf('MC')] ?? '';
       pgRowsOut.push([snapshotTime,'KSMP',mcName,cmdbStats.totalSiteMC,bT,mT,sT,cC,eT,td,pd,cmdbStats.bigMedYes,cmdbStats.critYes,cmdbStats.bigMedNo,cmdbStats.critNo,'','','','','','',bT,mT,sC,sNC,eC,eNC,mC,bC,td,yn]);
     }
 
     const latestKey = sortedKeys[sortedKeys.length-1];
     const latestRows = latestKey ? keyGroups.get(latestKey).rows : [];
+    const gdocSites = new Map();
+    for (let i = 0; i < sdlData.length; i++) {
+      const sourceRow = sdlData[i];
+      const sidKey = siteKeyFn(sourceRow[sdlSiteIdx]);
+      if (!sidKey) continue;
+      const key = String(sourceRow[sdlKeyIdx] ?? '');
+      const keyTime = key.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/);
+      const snapshotTime = keyTime ? `${keyTime[1]} ${keyTime[2]}` : key;
+      const previous = gdocSites.get(sidKey);
+      if (!previous || snapshotTime.localeCompare(previous.snapshotTime) >= 0) {
+        gdocSites.set(sidKey, {
+          row: sourceRow,
+          key,
+          snapshotTime,
+          status: statusByRow[i] || 'UP'
+        });
+      }
+    }
+    const latestDownRows = Array.from(gdocSites.values()).filter(site => site.status === 'DOWN');
     const gdocRowsOut = [GDOC_COLS.slice()];
-    const mcDP = cmdbStats.totalSiteMC ? (latestRows.length/cmdbStats.totalSiteMC) : 0;
+    const mcDP = cmdbStats.totalSiteMC ? (latestDownRows.length/cmdbStats.totalSiteMC) : 0;
     const mc25 = mcDP > 0.25 ? 'YES' : 'NO';
 
     function permGen(sidKey) {
@@ -1783,25 +1866,28 @@ async function process() {
       return '';
     }
 
-    for (const r of latestRows) {
-      const rKey = String(r[outHeader.indexOf('Key')]??'');
-      const rSid = String(r[outHeader.indexOf('Site Id')]??'').trim();
-      const sidKey = siteKeyFn(rSid);
-      const origSdl = sdlSideMap.get(rKey+'||'+sidKey) || null;
-      const get = col => r[outHeader.indexOf(col)] ?? '';
-      const statusVal = get('Status') || 'DOWN';
-      let scRaw = sdlGet(origSdl,'Site Class(Priority)')||sdlGet(origSdl,'Site Class')||cmdbGet(sidKey,'Site Priority Label')||get('Site Class(Priority)');
+    for (const [sidKey, site] of gdocSites) {
+      const origSdl = site.row;
+      const rSid = String(origSdl[sdlSiteIdx] ?? '').trim();
+      const statusVal = site.status;
+      const segValue = column => {
+        const idx = segColMap[column];
+        return idx === undefined ? '' : aggValue(sidKey, idx);
+      };
+      const mcArea = sdlGet(origSdl,'MC')||segValue('MC')||cmdbGet(sidKey,'MC Cluster');
+      let scRaw = sdlGet(origSdl,'Site Class(Priority)')||sdlGet(origSdl,'Site Class')||segValue('Site Class(Priority)')||cmdbGet(sidKey,'Site Priority Label');
       const sc = dedupeValues(scRaw,'/');
-      const ss = sdlGet(origSdl,'Super Sites')||sdlGet(origSdl,'Is Hub')||cmdbGet(sidKey,'Is Hub')||'No';
-      const t2 = sdlGet(origSdl,'>2TB')||sdlGet(origSdl,'Traffic Class')||cmdbGet(sidKey,'Traffic Class')||'No';
-      const p0 = sdlGet(origSdl,'P0')||sdlGet(origSdl,'P0 Sites')||cmdbGet(sidKey,'P0 Sites')||'No';
-      const vv = sdlGet(origSdl,'VVIP');
-      const vi = sdlGet(origSdl,'VIP')||get('VIP')||cmdbGet(sidKey,'Is VIP')||'No';
-      const sn = cmdbGet(sidKey,'Site Name*')||get('BTS Name');
-      const ht = cmdbGet(sidKey,'HUB Type')||get('Hub Type');
+      const ss = sdlGet(origSdl,'Super Sites')||sdlGet(origSdl,'Is Hub')||segValue('Super Sites')||cmdbGet(sidKey,'Is Hub')||'No';
+      const t2 = sdlGet(origSdl,'>2TB')||sdlGet(origSdl,'Traffic Class')||segValue('>2TB')||cmdbGet(sidKey,'Traffic Class')||'No';
+      const p0 = sdlGet(origSdl,'P0')||sdlGet(origSdl,'P0 Sites')||segValue('P0')||cmdbGet(sidKey,'P0 Sites')||'No';
+      const vv = sdlGet(origSdl,'VVIP')||segValue('VVIP');
+      const vi = sdlGet(origSdl,'VIP')||segValue('VIP')||cmdbGet(sidKey,'Is VIP')||'No';
+      const sn = sdlGet(origSdl,'Site Name')||segValue('BTS Name')||cmdbGet(sidKey,'Site Name*');
+      const ht = sdlGet(origSdl,'Hub Type')||segValue('Hub Type')||cmdbGet(sidKey,'HUB Type');
       const fo = cmdbGet(sidKey,'FM Office*');
       const rs = cmdbGet(sidKey,'Rts Name')||cmdbGet(sidKey,'Rts Id');
-      gdocRowsOut.push([get('MC')||cmdbGet(sidKey,'MC Cluster'),mc25,rSid,sn,statusVal,ht,get('Transport Outage'),permGen(sidKey),sc,ss,t2,p0,vv,vi,'','',fo,rs,'','']);
+      const transport = sdlGet(origSdl,'Transport Outage')||segValue('Transport Outage');
+      gdocRowsOut.push([mcArea,mc25,rSid,sn,statusVal,ht,transport,permGen(sidKey),sc,ss,t2,p0,vv,vi,'','',fo,rs,'','']);
     }
 
     /* ═══ SUMMARY — pass summaryRows ═══ */
