@@ -1,6 +1,21 @@
 services:
+  cmdb-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    environment:
+      CMDB_API_TOKEN: "${CMDB_API_TOKEN:?Set CMDB_API_TOKEN before deployment}"
+      CMDB_DATA_DIR: /data/cmdb
+    volumes:
+      - cmdb_data:/data/cmdb
   web:
     build: .
     restart: unless-stopped
+    depends_on:
+      - cmdb-api
     ports:
-      - "${PORT:-8080}:80"
+      - "127.0.0.1:${PORT:-8080}:80"
+
+volumes:
+  cmdb_data:

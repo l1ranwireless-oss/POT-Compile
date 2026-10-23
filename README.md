@@ -12,8 +12,19 @@ Script membuat folder `dist/`, menyalin aplikasi, membangun image Nginx, dan men
 
 ## Database CMDB
 
-Saat file CMDB diunggah, aplikasi memvalidasi sheet dan kolom `Site Id`, lalu membuat cache chunk untuk kalkulasi. File sumber disimpan ke IndexedDB browser agar dapat dipulihkan setelah refresh, dan dapat dihapus melalui tombol **Clear**. Jika IndexedDB tidak tersedia atau penyimpanan gagal, CMDB tetap dapat digunakan selama sesi browser saat ini, tetapi perlu diunggah kembali setelah refresh. Data tetap berada di browser/perangkat pengguna; deployment statis ini tidak mengirim CMDB ke server. Akses melalui `localhost` atau HTTPS untuk mengaktifkan penyimpanan IndexedDB.
+Deployment Docker menyediakan API CMDB terautentikasi dan menyimpan file pada named volume persisten `cmdb_data` di `/data/cmdb`. File tetap divalidasi dan diproses di browser; salinan sumber hanya dikirim ke server ketika tombol **Simpan CMDB** atau **Update CMDB** digunakan. Tombol **Muat Server** mengambil salinan tersimpan. IndexedDB tetap digunakan sebagai cache browser lokal.
+
+Atur token rahasia sebelum menjalankan deployment:
+
+```sh
+export CMDB_API_TOKEN="$(openssl rand -hex 32)"
+sh deploy.sh
+```
+
+Masukkan token yang sama pada kontrol server di kartu CMDB. Token hanya disimpan di memori halaman dan tidak dimasukkan ke repository. **Simpan CMDB** membuat salinan server pertama; **Update CMDB** memvalidasi file yang dipilih di browser lalu mengganti salinan server; **Muat Server** memulihkan file tersebut ke aplikasi. Batas upload adalah 100 MB. Data server bertahan selama volume `cmdb_data` dipertahankan.
+
+Layanan web di-bind ke `127.0.0.1` secara default dan port dapat diubah, misalnya `PORT=9000 sh deploy.sh`. Untuk akses jaringan, tempatkan di belakang reverse proxy HTTPS dan batasi akses ke pengguna/jaringan yang berwenang. Jangan kirim token melalui koneksi HTTP publik. GitHub Pages bersifat static dan tidak menyediakan API/penyimpanan CMDB server; fitur server hanya tersedia pada deployment Docker ini.
 
 ## Pencocokan site
 
-Sheet `bcp_segmentation_export_sheet` menggunakan daftar Site ID dari POT sebagai dasar. Kolom `Impact Category` yang kosong diisi `Fully Site Down`. Site yang tidak ditemukan di file Segmentation tetap disertakan dengan status `UP`; data Segmentation dan CMDB dicocokkan menggunakan Site ID yang dinormalisasi. Nilai POT/Segmentation yang sudah terisi dipertahankan, sedangkan kolom kosong yang tersedia di CMDB dilengkapi dari CMDB. GDOC mengambil Site ID dan status langsung dari baris `bcp_segmentation_export_sheet`, mempertahankan setiap Site ID unik (menggunakan baris terbaru untuk ID yang berulang), dan melengkapi data lain yang kosong dari CMDB. Perhitungan site down, PG, dan ambang MC >25% hanya menghitung status `DOWN`.
+Sheet `bcp_segmentation_export_sheet` menggunakan daftar Site ID dari POT sebagai dasar. Kolom `Impact Category` yang kosong diisi `Fully Site Down`. Site yang tidak ditemukan di file Segmentation tetap disertakan dengan status `UP`; data Segmentation dan CMDB dicocokkan menggunakan Site ID yang dinormalisasi. Nilai POT/Segmentation yang sudah terisi dipertahankan, sedangkan kolom kosong yang tersedia di CMDB dilengkapi dari CMDB. GDOC mengambil daftar Site ID langsung dari POT Site Down List dan status hasil pencocokan Segmentation, tanpa terpengaruh filter tampilan sheet segmentation. Setiap Site ID unik dipertahankan (menggunakan baris POT terbaru untuk ID yang berulang), lalu data lainnya dilengkapi dari POT, Segmentation, atau CMDB. Dengan demikian, Site ID `UP` tetap muncul di GDOC meskipun sheet segmentation difilter ke `DOWN`. Perhitungan site down, PG, dan ambang MC >25% hanya menghitung status `DOWN`.
