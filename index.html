@@ -48,7 +48,7 @@
   @keyframes titleGlow{0%,100%{filter:drop-shadow(0 0 20px rgba(0,217,255,0.5))}50%{filter:drop-shadow(0 0 30px rgba(177,74,255,0.7))}}
   .header p{color:var(--text-secondary);font-size:13px;font-weight:500}
   .header p b{color:var(--text-primary)}
-  .upload-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+  .upload-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px}
   @media(max-width:1100px){.upload-grid{grid-template-columns:repeat(2,1fr)}}
   @media(max-width:600px){.upload-grid{grid-template-columns:1fr}}
   .upload-card{background:var(--bg-card);backdrop-filter:blur(20px);border-radius:16px;padding:20px;box-shadow:var(--shadow-card);border:1px solid var(--border-subtle);border-top:3px solid;transition:all .4s;position:relative;overflow:hidden;animation:cardIn .7s ease-out backwards}
@@ -93,6 +93,11 @@
   .file-info .warn-tag{color:var(--accent-orange);font-size:10px;font-weight:600;margin-top:2px}
   .file-info .remove{position:absolute;right:8px;top:8px;color:var(--accent-red);cursor:pointer;font-size:10px;font-weight:700;background:var(--bg-card);padding:3px 8px;border-radius:6px;border:1px solid rgba(255,56,96,.3);transition:all .2s}
   .file-info .remove:hover{background:var(--accent-red);color:#fff}
+  .cmdb-badge{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:10px;font-size:11px;font-family:'JetBrains Mono',monospace;margin-bottom:16px;transition:all .3s;animation:fadeInUp .6s ease-out .5s both}
+  .cmdb-badge.loaded{background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.3);color:var(--accent-green)}
+  .cmdb-badge.empty{background:var(--bg-input);border:1px solid var(--border-subtle);color:var(--text-muted)}
+  .cache-clear-btn{margin-left:auto;padding:4px 12px;border-radius:6px;border:1px solid currentColor;background:transparent;color:inherit;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s}
+  .cache-clear-btn:hover{background:currentColor;color:var(--bg-primary)}
   .config-bar{background:var(--bg-card);backdrop-filter:blur(20px);border:1px solid var(--border-subtle);border-radius:14px;padding:18px 22px;box-shadow:var(--shadow-card);margin-bottom:24px;display:flex;gap:22px;flex-wrap:wrap;align-items:center;animation:fadeInUp .6s ease-out .4s both}
   @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
   .config-bar label{font-size:12px;font-weight:600;color:var(--text-secondary);display:flex;align-items:center;gap:8px;cursor:pointer;flex-wrap:wrap}
@@ -263,7 +268,7 @@
 
     <div class="upload-card cmdb">
       <h2>🟡 CMDB <span class="badge yellow">OPSIONAL</span></h2>
-      <div class="desc">Master fallback · 14 kolom</div>
+      <div class="desc">Auto chunking · 14 kolom · cache system</div>
       <label class="drop-zone" id="dz-cmdb">
         <input type="file" id="file-cmdb" accept=".xlsx,.xls,.csv">
         <div class="icon">📙</div>
@@ -296,6 +301,11 @@
     </div>
   </div>
 
+  <div class="cmdb-badge empty" id="cmdb-cache-badge">
+    ⚪ <b>CMDB Cache:</b> kosong
+    <button class="cache-clear-btn" onclick="clearCMDB()">🗑️ Clear</button>
+  </div>
+
   <div class="config-bar">
     <label>🔍 Filter: <select id="filter-status"><option value="all" selected>Semua</option><option value="down">Hanya DOWN</option><option value="up">Hanya UP</option></select></label>
     <label>📋 Header: <select id="header-mode"><option value="template" selected>Template BCP</option><option value="dynamic">Dinamis</option></select></label>
@@ -313,7 +323,7 @@
       <div class="stage" id="stage-pot"><div class="indicator">1</div><div class="text">Membaca POT</div><div class="detail" id="det-pot"></div></div>
       <div class="stage" id="stage-seg"><div class="indicator">2</div><div class="text">Membaca Segmentation + CMDB</div><div class="detail" id="det-seg"></div></div>
       <div class="stage" id="stage-zip"><div class="indicator">3</div><div class="text">Membaca ZIP Power Alarm</div><div class="detail" id="det-zip"></div></div>
-      <div class="stage" id="stage-base"><div class="indicator">4</div><div class="text">Menyusun Base SDL</div><div class="detail" id="det-base"></div></div>
+      <div class="stage" id="stage-base"><div class="indicator">4</div><div class="text">Chunking CMDB + Base SDL</div><div class="detail" id="det-base"></div></div>
       <div class="stage" id="stage-build"><div class="indicator">5</div><div class="text">Membangun Segmentation</div><div class="detail" id="det-build"></div></div>
       <div class="stage" id="stage-agg"><div class="indicator">6</div><div class="text">Membangun Diagram + PG + GDOC</div><div class="detail" id="det-agg"></div></div>
       <div class="stage" id="stage-excel"><div class="indicator">7</div><div class="text">Menyusun Excel + Summary</div><div class="detail" id="det-excel"></div></div>
@@ -404,7 +414,8 @@ const COL_ALIASES = {'First Occurred(NT)':['First Occurrence','First Occurred','
 const SNAPSHOT_COLORS = [{fill:'DBEAFE',font:'1E40AF'},{fill:'D1FAE5',font:'065F46'},{fill:'FEF3C7',font:'92400E'},{fill:'FFEDD5',font:'9A3412'},{fill:'FEE2E2',font:'991B1B'},{fill:'F3E8FF',font:'6B21A8'},{fill:'FFE4E6',font:'9F1239'},{fill:'CCFBF1',font:'134E4A'}];
 const CMDB_NEEDED_COLS = ['Site Id','Site Name*','HUB Type','Site Priority Label','Has Generator','DG Status','Traffic Class','P0 Sites','Is VIP','FM Office*','Rts Name','Rts Id','MC Cluster','Is Hub'];
 const CMDB_NEEDED_IDX = {}; CMDB_NEEDED_COLS.forEach((a,i)=>{CMDB_NEEDED_IDX[a]=i;});
-const FILE_SIZE_WARN_MB = 10, CHUNK_SIZE = 5000;
+const FILE_SIZE_WARN_MB = 10;
+const CHUNK_SIZE_CMDB = 5000;
 const STATUS_DOWN_COLOR = 'FF0000', STATUS_UP_COLOR = '00B050';
 const FONT_BLACK = '000000', FONT_WHITE = 'FFFFFF';
 
@@ -412,6 +423,189 @@ let potFile = null, segFile = null, cmdbFile = null, zipFile = null;
 let lastOutputBlob = null;
 let processing = false;
 const logLines = [];
+
+/* ═══════════════ CMDB CACHE SYSTEM ═══════════════ */
+const CMDB_CACHE = {
+  chunks: [],
+  index: new Map(),
+  statsByMC: new Map(),
+  globalStats: null,
+  meta: { rows:0, cols:0, chunks:0, processed:0, skipped:0, sites:0, mcCount:0, loadedAt:null, loadedAtISO:null, signature:null }
+};
+
+function emptyStats(displayName) {
+  return { displayName: displayName || '', total:0, big:0, medium:0, small:0, end:0, bigMedDG:0, bigMedNoDG:0, critical:0, criticalDG:0, criticalNoDG:0 };
+}
+
+function incrementStats(stats, hub, cls, hasDG) {
+  stats.total++;
+  const hubU = (hub || '').toUpperCase();
+  const clsU = (cls || '').toUpperCase();
+  const isBig = hubU.includes('BIG');
+  const isMed = hubU.includes('MEDIUM');
+  const isSmall = hubU.includes('SMALL');
+  const isEnd = hubU.includes('END');
+  const isCrit = clsU.includes('CRITICAL');
+  const isBigMed = isBig || isMed;
+  if (isBig) stats.big++;
+  if (isMed) stats.medium++;
+  if (isSmall) stats.small++;
+  if (isEnd) stats.end++;
+  if (isBigMed) { if (hasDG) stats.bigMedDG++; else stats.bigMedNoDG++; }
+  if (isCrit) { stats.critical++; if (hasDG) stats.criticalDG++; else stats.criticalNoDG++; }
+}
+
+function clearCMDB() {
+  const hadSites = CMDB_CACHE.meta.sites || 0;
+  CMDB_CACHE.chunks.forEach(ch => ch.clear());
+  CMDB_CACHE.chunks.length = 0;
+  CMDB_CACHE.index.clear();
+  CMDB_CACHE.statsByMC.clear();
+  CMDB_CACHE.globalStats = emptyStats('ALL');
+  CMDB_CACHE.meta = { rows:0, cols:0, chunks:0, processed:0, skipped:0, sites:0, mcCount:0, loadedAt:null, loadedAtISO:null, signature:null };
+  if (hadSites > 0) log(`🗑️ CMDB cache cleared (was: ${hadSites} sites)`);
+  updateCMDBBadge();
+  try { if (window.gc) window.gc(); } catch (e) {}
+}
+
+function updateCMDBBadge() {
+  const badge = document.getElementById('cmdb-cache-badge');
+  if (!badge) return;
+  const m = CMDB_CACHE.meta;
+  if (!m.sites || m.sites === 0) {
+    badge.className = 'cmdb-badge empty';
+    badge.innerHTML = '⚪ <b>CMDB Cache:</b> kosong <button class="cache-clear-btn" onclick="clearCMDB()">🗑️ Clear</button>';
+  } else {
+    badge.className = 'cmdb-badge loaded';
+    badge.innerHTML = `🟢 <b>CMDB Cache:</b> ${m.sites.toLocaleString('id-ID')} sites · ${m.chunks} chunks · ${m.mcCount} MC · ${m.rows.toLocaleString('id-ID')} rows · loaded ${m.loadedAt} <button class="cache-clear-btn" onclick="clearCMDB()">🗑️ Clear</button>`;
+  }
+}
+
+async function loadCMDBInChunks(cmdbRowsRaw, cmdbHeader, colIdxMap, siteKeyFn) {
+  clearCMDB();
+  const sidColIdx = colIdxMap['Site Id'];
+  const mcColIdx = colIdxMap['MC Cluster'];
+  const hubColIdx = colIdxMap['HUB Type'];
+  const clsColIdx = colIdxMap['Site Priority Label'];
+  const hgColIdx = colIdxMap['Has Generator'];
+  const dsColIdx = colIdxMap['DG Status'];
+  
+  const dataRows = cmdbRowsRaw;
+  const total = dataRows.length;
+  const numChunks = Math.ceil(total / CHUNK_SIZE_CMDB) || 1;
+  
+  CMDB_CACHE.globalStats = emptyStats('ALL');
+  
+  let processed = 0, skipped = 0;
+  log(`📦 CMDB chunking: ${total.toLocaleString('id-ID')} rows → ${numChunks} chunks (${CHUNK_SIZE_CMDB}/chunk)`);
+  
+  for (let c = 0; c < numChunks; c++) {
+    const start = c * CHUNK_SIZE_CMDB;
+    const end = Math.min(start + CHUNK_SIZE_CMDB, total);
+    const chunkMap = new Map();
+    
+    for (let i = start; i < end; i++) {
+      const r = dataRows[i];
+      if (!r || r.length === 0) { skipped++; continue; }
+      const sid = siteKeyFn(r[sidColIdx]);
+      if (!sid) { skipped++; continue; }
+      if (CMDB_CACHE.index.has(sid)) { skipped++; continue; }
+      
+      const comp = new Array(CMDB_NEEDED_COLS.length);
+      for (let k = 0; k < CMDB_NEEDED_COLS.length; k++) {
+        const idx = colIdxMap[CMDB_NEEDED_COLS[k]];
+        comp[k] = idx >= 0 ? (r[idx] ?? '') : '';
+      }
+      chunkMap.set(sid, comp);
+      CMDB_CACHE.index.set(sid, c);
+      processed++;
+      
+      const mcRaw = mcColIdx >= 0 ? String(r[mcColIdx] || '').trim() : '';
+      const hub = hubColIdx >= 0 ? String(r[hubColIdx] || '') : '';
+      const cls = clsColIdx >= 0 ? String(r[clsColIdx] || '') : '';
+      const hg = hgColIdx >= 0 ? String(r[hgColIdx] || '').toUpperCase() : '';
+      const ds = dsColIdx >= 0 ? String(r[dsColIdx] || '').toUpperCase() : '';
+      const hasDG = hg.includes('YES')||hg.includes('AVAILABLE')||ds.includes('ACTIVE')||ds.includes('RUN');
+      
+      incrementStats(CMDB_CACHE.globalStats, hub, cls, hasDG);
+      
+      if (mcRaw) {
+        const mcKey = normMCKey(mcRaw);
+        if (mcKey) {
+          let mcs = CMDB_CACHE.statsByMC.get(mcKey);
+          if (!mcs) { mcs = emptyStats(mcRaw); CMDB_CACHE.statsByMC.set(mcKey, mcs); }
+          incrementStats(mcs, hub, cls, hasDG);
+        }
+      }
+    }
+    
+    CMDB_CACHE.chunks.push(chunkMap);
+    
+    const pct = Math.round((end/total)*100);
+    document.getElementById('det-base').textContent = `CMDB ${c+1}/${numChunks} · ${end.toLocaleString('id-ID')}/${total.toLocaleString('id-ID')} (${pct}%)`;
+    log(`📦 Chunk ${c+1}/${numChunks} · ${processed.toLocaleString('id-ID')} processed · ${skipped} skipped`);
+    
+    await sleep(0);
+  }
+  
+  CMDB_CACHE.meta = {
+    rows: total, cols: (cmdbHeader || []).length,
+    chunks: numChunks, processed, skipped,
+    sites: CMDB_CACHE.index.size,
+    mcCount: CMDB_CACHE.statsByMC.size,
+    loadedAt: new Date().toLocaleTimeString('id-ID'),
+    loadedAtISO: new Date().toISOString(),
+    signature: null
+  };
+  
+  dataRows.length = 0;
+  log(`✅ CMDB cache ready: ${CMDB_CACHE.index.size.toLocaleString('id-ID')} sites · ${numChunks} chunks · ${CMDB_CACHE.statsByMC.size} MC`);
+  updateCMDBBadge();
+}
+
+function cmdbGet(sidKey, alias) {
+  if (!sidKey) return '';
+  const chunkIdx = CMDB_CACHE.index.get(sidKey);
+  if (chunkIdx === undefined) return '';
+  const chunk = CMDB_CACHE.chunks[chunkIdx];
+  if (!chunk) return '';
+  const row = chunk.get(sidKey);
+  if (!row) return '';
+  const idx = CMDB_NEEDED_IDX[alias];
+  if (idx == null) return '';
+  const v = row[idx];
+  return v !== '' && v != null ? v : '';
+}
+
+function computeCMDBStats(mc) {
+  let stats = CMDB_CACHE.globalStats;
+  if (mc) {
+    const s = CMDB_CACHE.statsByMC.get(normMCKey(mc));
+    if (s) stats = s;
+  }
+  if (!stats) return { totalSiteMC:0, bigMedYes:0, bigMedNo:0, critYes:0, critNo:0 };
+  return {
+    totalSiteMC: stats.total || 0,
+    bigMedYes: stats.bigMedDG || 0,
+    bigMedNo: stats.bigMedNoDG || 0,
+    critYes: stats.criticalDG || 0,
+    critNo: stats.criticalNoDG || 0
+  };
+}
+
+function getHubTotalByMC(mc, hubKey) {
+  let stats = CMDB_CACHE.globalStats;
+  if (mc) {
+    const s = CMDB_CACHE.statsByMC.get(normMCKey(mc));
+    if (s) stats = s;
+  }
+  if (!stats) return 0;
+  if (hubKey === 'big') return stats.big || 0;
+  if (hubKey === 'medium') return stats.medium || 0;
+  if (hubKey === 'small') return stats.small || 0;
+  if (hubKey === 'end') return stats.end || 0;
+  return stats.total || 0;
+}
 
 /* ═══════════════ UTIL ═══════════════ */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -519,7 +713,7 @@ function findHeaderRow(rows, targetHeaders, scan=25) {
   return bestScore >= 2 ? bestRow : -1;
 }
 
-/* ═══════════════ ZIP PARSING ═══════════════ */
+/* ═══════════════ ZIP ═══════════════ */
 async function parseZipPowerAlarm(zipFile, knownSiteNorms) {
   if (!window.JSZip) throw new Error('JSZip library belum termuat');
   const zip = await JSZip.loadAsync(zipFile);
@@ -575,17 +769,23 @@ function bindDrop(zoneId, inputId, key) {
 function setFile(key, file) {
   const validExt = key === 'zip' ? /\.zip$/i.test(file.name) : /\.(xlsx|xls|csv)$/i.test(file.name);
   if (!validExt) { toast(key === 'zip' ? 'Harus file .zip' : 'Format harus .xlsx / .xls / .csv', 'error'); return; }
+  
   if (key === 'pot') potFile = file;
   else if (key === 'seg') segFile = file;
-  else if (key === 'cmdb') cmdbFile = file;
+  else if (key === 'cmdb') {
+    cmdbFile = file;
+    clearCMDB();
+    log(`🆕 CMDB baru diupload — cache lama dibersihkan`);
+  }
   else zipFile = file;
+  
   document.getElementById('info-' + key).classList.add('show');
   document.getElementById('name-' + key).textContent = file.name;
   document.getElementById('meta-' + key).textContent = fmtBytes(file.size) + ' · ' + new Date().toLocaleTimeString('id-ID');
   const sz = file.size / (1024*1024);
   const wEl = document.getElementById('warn-' + key);
   const iEl = document.getElementById('info-' + key);
-  if (sz > FILE_SIZE_WARN_MB) { wEl.textContent = `⚠️ File besar (${sz.toFixed(1)} MB)`; iEl.classList.add('warn'); }
+  if (sz > FILE_SIZE_WARN_MB) { wEl.textContent = `⚠️ File besar (${sz.toFixed(1)} MB) — auto chunking aktif`; iEl.classList.add('warn'); }
   else { wEl.textContent = ''; iEl.classList.remove('warn'); }
   log(`File ${key.toUpperCase()}: ${file.name}`);
   toast(`✅ ${file.name} dimuat`, 'success');
@@ -594,7 +794,7 @@ function setFile(key, file) {
 function clearFile(key) {
   if (key === 'pot') { potFile = null; document.getElementById('file-pot').value = ''; }
   else if (key === 'seg') { segFile = null; document.getElementById('file-seg').value = ''; }
-  else if (key === 'cmdb') { cmdbFile = null; document.getElementById('file-cmdb').value = ''; }
+  else if (key === 'cmdb') { cmdbFile = null; document.getElementById('file-cmdb').value = ''; clearCMDB(); }
   else { zipFile = null; document.getElementById('file-zip').value = ''; }
   document.getElementById('info-' + key).classList.remove('show');
   document.getElementById('warn-' + key).textContent = '';
@@ -706,8 +906,7 @@ function deriveGensetLabel(sidKey, gdocGensetRaw, segLookup, segHeader) {
 
 /* ═══════════════ BUILD SUMMARY ═══════════════ */
 function buildSummaryFromGDOCPG(params) {
-  const { gdocRows, pgRowsOut, cmdbLookup, cmdbGet, targetMC, siteKeyFn,
-    powerAlarmSites, segLookup, segHeader } = params;
+  const { gdocRows, pgRowsOut, targetMC, siteKeyFn, powerAlarmSites, segLookup, segHeader } = params;
   
   const pgData = pgRowsOut.slice(2);
   const pgFirst = pgData[0] || [];
@@ -798,17 +997,7 @@ function buildSummaryFromGDOCPG(params) {
     const down = sitesDown.length;
     let total = 0;
     if (cat.format === 'pct') {
-      for (const [nid] of cmdbLookup) {
-        if (targetMC) {
-          const mc = String(cmdbGet(nid, 'MC Cluster') || '').toUpperCase().trim();
-          if (mc && mc !== targetMC.toUpperCase()) continue;
-        }
-        const hub = String(cmdbGet(nid, 'HUB Type') || '').toUpperCase();
-        let match = false;
-        if (cat.key === 'big' && hub.includes('BIG HUB')) match = true;
-        else if (cat.key === 'medium' && hub.includes('MEDIUM HUB')) match = true;
-        if (match) total++;
-      }
+      total = getHubTotalByMC(targetMC, cat.key);
     }
     let siteList = [];
     if (cat.showSites) {
@@ -824,15 +1013,10 @@ function buildSummaryFromGDOCPG(params) {
     });
   }
   
-  /* MC > 25% per-MC dengan fallback berlapis */
+  /* MC > 25% — dari statsByMC (O(1) per MC, bukan iterate ribuan site) */
   const mcUnique = new Map();
-  for (const [nid] of cmdbLookup) {
-    const mcRaw = String(cmdbGet(nid, 'MC Cluster') || '').trim();
-    if (!mcRaw) continue;
-    const mcKey = normMCKey(mcRaw);
-    if (!mcKey) continue;
-    if (!mcUnique.has(mcKey)) mcUnique.set(mcKey, { displayName: mcRaw, down: 0, total: 0 });
-    mcUnique.get(mcKey).total++;
+  for (const [mcKey, stats] of CMDB_CACHE.statsByMC) {
+    mcUnique.set(mcKey, { displayName: stats.displayName, down: 0, total: stats.total || 0 });
   }
   for (const s of downSites) {
     const mcRaw = (s.mcArea || '').trim();
@@ -841,12 +1025,10 @@ function buildSummaryFromGDOCPG(params) {
     if (mcUnique.has(mcKey)) mcUnique.get(mcKey).down++;
   }
   
-  /* FALLBACK: jika mcUnique kosong */
   if (mcUnique.size === 0 && targetMC) {
-    const safeTotal = totalSiteMC > 0 ? totalSiteMC : Math.max(1, cmdbLookup.size, totalDown);
-    const safeDown = totalDown > 0 ? totalDown : downSites.length;
-    mcUnique.set(normMCKey(targetMC), { displayName: targetMC, down: safeDown, total: safeTotal });
-    log(`⚠️ MC 25% fallback dipakai: "${targetMC}" (${safeDown}/${safeTotal})`);
+    const safeTotal = totalSiteMC > 0 ? totalSiteMC : Math.max(1, totalDown);
+    mcUnique.set(normMCKey(targetMC), { displayName: targetMC, down: totalDown, total: safeTotal });
+    log(`⚠️ MC 25% fallback: "${targetMC}" (${totalDown}/${safeTotal})`);
   }
   
   const mcAbove25List = [];
@@ -899,16 +1081,13 @@ function generateSummaryText(summary) {
       idx++;
     }
     
-    /* MC 25% — SELALU push */
     const mcCount = (summary.mcAbove25List && summary.mcAbove25List.length) || 0;
     lines.push(`_*MC Cluster Site Down More Than 25% = ${mcCount}_`);
     if (summary.mcAbove25List && summary.mcAbove25List.length > 0) {
       for (const m of summary.mcAbove25List) lines.push(m.mc);
     }
     
-    /* Footer — SELALU push */
     lines.push('_DIOC and FSO on coordinate for Power monitoring and Portable Genset movement_');
-    
     return lines.join('\n');
   } catch (err) {
     log('❌ generateSummaryText error: ' + err.message);
@@ -990,7 +1169,7 @@ async function process() {
     doneStage('stage-pot', summaryRows.length + ' baris · ' + summaryName);
     await sleep(100);
 
-    /* 2. SEG + CMDB — FIX: cmdbWb (bukan cmbdWb) */
+    /* 2. SEG + CMDB READ (with cache signature check) */
     startStage('stage-seg');
     await sleep(100);
     const segBuf = await segFile.arrayBuffer();
@@ -1000,17 +1179,43 @@ async function process() {
     log('SEG: ' + segRowsRaw.length + ' baris');
 
     let cmdbRowsRaw = null;
+    let cmdbHeaderStore = null;
+    let cmdbColIdxMapStore = null;
+    let cmdbSignature = null;
+
     if (cmdbFile) {
-      try {
-        const cmdbBuf = await cmdbFile.arrayBuffer();
-        const cmdbWb = XLSX.read(cmdbBuf, {type:'array', cellDates:false, cellNF:false, cellText:false});
-        cmdbRowsRaw = sheetToAOA(cmdbWb, cmdbWb.SheetNames[0]);
-        log('✅ CMDB: ' + cmdbRowsRaw.length + ' baris × ' + (cmdbRowsRaw[0]||[]).length + ' kolom');
-      } catch (e) { log('⚠️ CMDB gagal: ' + e.message); }
+      cmdbSignature = `${cmdbFile.name}|${cmdbFile.size}|${cmdbFile.lastModified}`;
+      if (CMDB_CACHE.meta.signature === cmdbSignature && CMDB_CACHE.meta.sites > 0) {
+        log(`♻️ CMDB cache valid — skip re-read (signature match)`);
+      } else {
+        try {
+          const cmdbBuf = await cmdbFile.arrayBuffer();
+          const cmdbWb = XLSX.read(cmdbBuf, {type:'array', cellDates:false, cellNF:false, cellText:false});
+          cmdbRowsRaw = sheetToAOA(cmbdbWb, cmdbWb.SheetNames[0]);
+          log('✅ CMDB read: ' + cmdbRowsRaw.length + ' baris × ' + (cmdbRowsRaw[0]||[]).length + ' kolom');
+          
+          let hIdx = 0;
+          for (let i = 0; i < Math.min(5, cmdbRowsRaw.length); i++) {
+            const r = cmdbRowsRaw[i] || [];
+            if (r.some(h => norm(h).includes('site') && norm(h).includes('id'))) { hIdx = i; break; }
+          }
+          cmdbHeaderStore = cmdbRowsRaw[hIdx] || [];
+          cmdbColIdxMapStore = {};
+          for (const alias of CMDB_NEEDED_COLS) {
+            const f = autoMatch(alias, cmdbHeaderStore);
+            cmdbColIdxMapStore[alias] = f ? cmdbHeaderStore.indexOf(f) : -1;
+          }
+          const kept = CMDB_NEEDED_COLS.filter(a => cmdbColIdxMapStore[a] >= 0).length;
+          log(`CMDB selective: ${kept}/${CMDB_NEEDED_COLS.length} kolom`);
+          cmdbRowsRaw = cmdbRowsRaw.slice(hIdx + 1);
+        } catch (e) {
+          log('⚠️ CMDB gagal: ' + e.message);
+        }
+      }
     } else {
       log('ℹ️ CMDB tidak diupload');
     }
-    doneStage('stage-seg', segRowsRaw.length + ' SEG · ' + (cmdbRowsRaw ? cmdbRowsRaw.length + ' CMDB' : '-'));
+    doneStage('stage-seg', segRowsRaw.length + ' SEG · ' + (cmdbRowsRaw ? cmdbRowsRaw.length + ' CMDB (raw)' : (CMDB_CACHE.meta.sites > 0 ? CMDB_CACHE.meta.sites + ' cached' : '-')));
     await sleep(100);
 
     /* 3. ZIP */
@@ -1048,7 +1253,7 @@ async function process() {
     }
     await sleep(100);
 
-    /* 4. Base SDL */
+    /* 4. Base SDL + CMDB Chunking */
     startStage('stage-base');
     await sleep(100);
     const sdlName = findSDLSheet(potWb);
@@ -1123,49 +1328,14 @@ async function process() {
       return v !== '' && v != null ? v : '';
     }
 
-    const cmdbLookup = new Map();
-    if (cmdbRowsRaw && cmdbRowsRaw.length > 1) {
-      let hIdx = 0;
-      for (let i = 0; i < Math.min(5, cmdbRowsRaw.length); i++) {
-        const r = cmdbRowsRaw[i] || [];
-        if (r.some(h => norm(h).includes('site') && norm(h).includes('id'))) { hIdx = i; break; }
-      }
-      const cmdbHeader = cmdbRowsRaw[hIdx] || [];
-      const colIdxMap = {};
-      for (const alias of CMDB_NEEDED_COLS) {
-        const f = autoMatch(alias, cmdbHeader);
-        colIdxMap[alias] = f ? cmdbHeader.indexOf(f) : -1;
-      }
-      const kept = CMDB_NEEDED_COLS.filter(a => colIdxMap[a] >= 0).length;
-      log('CMDB selective: ' + kept + '/' + CMDB_NEEDED_COLS.length + ' kolom');
-      
-      const sidColIdx = colIdxMap['Site Id'];
-      if (sidColIdx >= 0) {
-        const dataRows = cmdbRowsRaw.slice(hIdx+1);
-        let cnt = 0;
-        for (let i = 0; i < dataRows.length; i++) {
-          const r = dataRows[i]; if (!r || r.length===0) continue;
-          const sid = siteKeyFn(r[sidColIdx]); if (!sid) continue;
-          if (cmdbLookup.has(sid)) continue;
-          const comp = new Array(CMDB_NEEDED_COLS.length);
-          for (let k = 0; k < CMDB_NEEDED_COLS.length; k++) {
-            const idx = colIdxMap[CMDB_NEEDED_COLS[k]];
-            comp[k] = idx >= 0 ? (r[idx] ?? '') : '';
-          }
-          cmdbLookup.set(sid, comp);
-          cnt++;
-          if (cnt % CHUNK_SIZE === 0) { document.getElementById('det-base').textContent = `CMDB ${cnt}/${dataRows.length}...`; await sleep(0); }
-        }
-        log('✅ CMDB lookup: ' + cmdbLookup.size + ' site');
-      }
+    /* CMDB CHUNKING */
+    if (cmdbRowsRaw && cmdbHeaderStore && cmdbColIdxMapStore) {
+      await loadCMDBInChunks(cmdbRowsRaw, cmdbHeaderStore, cmdbColIdxMapStore, siteKeyFn);
+      CMDB_CACHE.meta.signature = cmdbSignature;
       cmdbRowsRaw = null;
-    }
-
-    function cmdbGet(sidKey, alias) {
-      const arr = cmdbLookup.get(sidKey); if (!arr) return '';
-      const idx = CMDB_NEEDED_IDX[alias]; if (idx == null) return '';
-      const v = arr[idx];
-      return v !== '' && v != null ? v : '';
+      cmdbRowsRaw = null;  // double-hint GC
+    } else if (!cmdbFile) {
+      log('ℹ️ No CMDB — stats akan kosong');
     }
 
     const statusByRow = [];
@@ -1177,7 +1347,8 @@ async function process() {
       if (isDown) downCount++;
     }
     log('Status: DOWN=' + downCount + ' · UP=' + (sdlData.length - downCount));
-    doneStage('stage-base', sdlData.length + ' · DOWN=' + downCount);
+    const cacheInfo = CMDB_CACHE.meta.sites > 0 ? ` · ${CMDB_CACHE.meta.sites} cached` : '';
+    doneStage('stage-base', sdlData.length + ' SDL · DOWN=' + downCount + cacheInfo);
     await sleep(100);
 
     /* 5. Segmentation */
@@ -1324,27 +1495,8 @@ async function process() {
     const targetMC = (segRowsOut[1] && mcIdx>=0) ? String(segRowsOut[1][mcIdx]??'').trim() : '';
     log('Target MC: "' + targetMC + '"');
 
-    function computeCMDBStats(mc) {
-      let total=0, bmy=0, bmn=0, cy=0, cn=0;
-      for (const [sidKey] of cmdbLookup) {
-        if (mc) {
-          const mv = String(cmdbGet(sidKey,'MC Cluster')||'').trim();
-          if (mv && mv.toUpperCase() !== mc.toUpperCase()) continue;
-        }
-        total++;
-        const hub = String(cmdbGet(sidKey,'HUB Type')||'').toUpperCase();
-        const cls = String(cmdbGet(sidKey,'Site Priority Label')||'').toUpperCase();
-        const hg = String(cmdbGet(sidKey,'Has Generator')||'').toUpperCase();
-        const ds = String(cmdbGet(sidKey,'DG Status')||'').toUpperCase();
-        const hasDG = hg.includes('YES')||hg.includes('AVAILABLE')||ds.includes('ACTIVE')||ds.includes('RUN');
-        const bm = hub.includes('BIG')||hub.includes('MEDIUM');
-        const cr = cls.includes('CRITICAL');
-        if (bm) hasDG ? bmy++ : bmn++;
-        if (cr) hasDG ? cy++ : cn++;
-      }
-      return {totalSiteMC:total, bigMedYes:bmy, bigMedNo:bmn, critYes:cy, critNo:cn};
-    }
     const cmdbStats = computeCMDBStats(targetMC);
+    log('CMDB stats: Total=' + cmdbStats.totalSiteMC);
 
     const pgRowsOut = [PG_CATEGORIES.slice(), PG_COLS.slice()];
     for (const key of sortedKeys) {
@@ -1406,10 +1558,9 @@ async function process() {
       gdocRowsOut.push([get('MC')||cmdbGet(sidKey,'MC Cluster'),mc25,rSid,sn,statusVal,ht,get('Transport Outage'),permGen(sidKey),sc,ss,t2,p0,vv,vi,'','',fo,rs,'','']);
     }
 
-    /* SUMMARY */
     const summary = buildSummaryFromGDOCPG({
       gdocRows: gdocRowsOut, pgRowsOut,
-      cmdbLookup, cmdbGet, targetMC, siteKeyFn,
+      targetMC, siteKeyFn,
       powerAlarmSites: zipFoundSites, segLookup, segHeader
     });
     renderSummary(summary);
@@ -1491,7 +1642,7 @@ async function process() {
     doneStage('stage-excel', fmtBytes(lastOutputBlob.size));
 
     const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
-    document.getElementById('perf-note').innerHTML = `⚡ Selesai dalam <b>${elapsed}s</b> · Summary siap copy`;
+    document.getElementById('perf-note').innerHTML = `⚡ Selesai dalam <b>${elapsed}s</b> · CMDB ${CMDB_CACHE.meta.sites.toLocaleString('id-ID')} sites cached`;
 
     animateNumber(document.getElementById('stat-diag'), diagRowsOut.length-1);
     animateNumber(document.getElementById('stat-seg'), segRowsOut.length-1);
@@ -1568,17 +1719,20 @@ function resetAll() {
   document.getElementById('result-card').classList.remove('show');
   document.getElementById('summary-card').classList.remove('show');
   document.getElementById('summary-text').value = '';
+  clearCMDB();
   logLines.length = 0;
   resetStages();
   checkReady();
-  toast('🔄 Reset selesai', 'success');
+  toast('🔄 Reset selesai · cache cleared', 'success');
 }
 
 bindDrop('dz-pot','file-pot','pot');
 bindDrop('dz-seg','file-seg','seg');
 bindDrop('dz-cmdb','file-cmdb','cmdb');
 bindDrop('dz-zip','file-zip','zip');
-log('Aplikasi siap · Semua bug fixed');
+CMDB_CACHE.globalStats = emptyStats('ALL');
+updateCMDBBadge();
+log('Aplikasi siap · Auto chunking CMDB + Cache system aktif');
 </script>
 </body>
 </html>
