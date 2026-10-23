@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - copilot/upload-cmdb-database
   workflow_dispatch:
 
 permissions:
