@@ -2345,9 +2345,8 @@ async function process() {
       const previousOutage = get('Previous Status Outage')||sdlGet(origSdl,'Previous Status Outage')||cmdbGet(sidKey,'Previous Status Outage');
       const gensetDeploy = get('Genset Deploy Status')||sdlGet(origSdl,'Genset Deploy Status')||cmdbGet(sidKey,'Genset Deploy Status');
       const additionalMCGenset = get('Additional MC>25% Portable Genset run')||sdlGet(origSdl,'Additional MC>25% Portable Genset run')||cmdbGet(sidKey,'Additional MC>25% Portable Genset run');
-      const ca = get('CA')||sdlGet(origSdl,'CA')||cmdbGet(sidKey,'CA');
       const updateTeam = get('Update Team')||sdlGet(origSdl,'Update Team')||cmdbGet(sidKey,'Update Team');
-      gdocRowsOut.push([mcArea,mc25,rSid,sn,statusVal,ht,previousOutage,permGen(sidKey),sc,ss,t2,p0,vv,vi,gensetDeploy,additionalMCGenset,fo,rs,ca,updateTeam]);
+      gdocRowsOut.push([mcArea,mc25,rSid,sn,statusVal,ht,previousOutage,permGen(sidKey),sc,ss,t2,p0,vv,vi,gensetDeploy,additionalMCGenset,fo,rs,'',updateTeam]);
     }
     const gdocOutputSiteIds = new Set(gdocRowsOut.slice(1).map(row => siteKeyFn(row[GDOC_IDX.SITE_ID])).filter(Boolean));
     const missingGdocOutputSiteIds = [...expectedGdocSiteIds].filter(sidKey => !gdocOutputSiteIds.has(sidKey));
