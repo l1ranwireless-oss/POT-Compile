@@ -1,0 +1,12 @@
+FROM python:3.12-alpine
+
+WORKDIR /app
+COPY cmdb_server.py /app/cmdb_server.py
+RUN adduser -D -u 10001 app \
+    && mkdir -p /data/cmdb \
+    && chown -R app:app /data/cmdb
+USER app
+
+ENV CMDB_DATA_DIR=/data/cmdb
+EXPOSE 8000
+CMD ["python", "-u", "/app/cmdb_server.py"]
