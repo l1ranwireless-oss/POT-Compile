@@ -593,9 +593,9 @@ const COL_ALIASES = {
   'FM Office*': ['FM Office*','FM Office','FME Office','FMOffice','FM_Office','Office','FM','FME'],
   'Rts Name': ['Rts Name','RTS','RtsName','RTS Name','RTS_Name','Rts'],
   'Rts Id': ['Rts Id','RtsId','RTS ID','RTS_ID','RTS'],
-  'Is Hub': ['Is Hub','Super Sites','SuperSites','IsHub','Is_Hub','Super Site'],
-  'Program': ['Program','Programme'],
-  'Super Sites': ['Super Sites','SuperSites','Is Hub','IsHub','Super Site'],
+  'Is Hub': ['Is Hub','IsHub','Is_Hub','Super Site'],
+  'Program': ['Program','Super Sites'],
+  'Super Sites': ['Program,'Super Sites'],
   'Genset': ['Genset','Genset Status','Generator Status','GensetStatus'],
   'Previous Status Outage': ['Previous Status Outage (BTS Local Down or Fully Site Outage)','Previous Status Outage','BTS Local Down or Fully Site Outage'],
   'Genset Deploy Status': ['Genset Deploy Status (Permanent DG run, BAU Portable Genset run)','Genset Deploy Status','Permanent DG run','BAU Portable Genset run'],
@@ -2318,7 +2318,7 @@ async function process() {
       const mcArea = get('MC')||sdlGet(origSdl,'MC')||segValue('MC')||cmdbGet(sidKey,'MC Cluster');
       let scRaw = get('Site Class(Priority)')||sdlGet(origSdl,'Site Class(Priority)')||sdlGet(origSdl,'Site Class')||segValue('Site Class(Priority)')||cmdbGet(sidKey,'Site Priority Label');
       const sc = dedupeValues(scRaw,'/');
-      const ss = get('Super Sites')||sdlGet(origSdl,'Super Sites')||sdlGet(origSdl,'Is Hub')||segValue('Super Sites')||cmdbGet(sidKey,'Program')||cmdbGet(sidKey,'Is Hub')||'No';
+      const ss = get('Super Sites')||sdlGet(origSdl,'Super Sites')||sdlGet(origSdl,'Is Hub')||segValue('Super Sites')||cmdbGet(sidKey,'Program')||cmdbGet(sidKey,'Program')||'No';
       const t2 = get('>2TB')||sdlGet(origSdl,'>2TB')||sdlGet(origSdl,'Traffic Class')||segValue('>2TB')||cmdbGet(sidKey,'Traffic Class')||'No';
       const p0 = get('P0')||sdlGet(origSdl,'P0')||sdlGet(origSdl,'P0 Sites')||segValue('P0')||cmdbGet(sidKey,'P0 Sites')||'No';
       const vv = get('VVIP')||sdlGet(origSdl,'VVIP')||segValue('VVIP');
@@ -2331,7 +2331,7 @@ async function process() {
       const previousOutage = get('Previous Status Outage')||sdlGet(origSdl,'Previous Status Outage')||cmdbGet(sidKey,'Previous Status Outage');
       const gensetDeploy = get('Genset Deploy Status')||sdlGet(origSdl,'Genset Deploy Status')||cmdbGet(sidKey,'Genset Deploy Status');
       const additionalMCGenset = get('Additional MC>25% Portable Genset run')||sdlGet(origSdl,'Additional MC>25% Portable Genset run')||cmdbGet(sidKey,'Additional MC>25% Portable Genset run');
-      const ca = get('CA')||sdlGet(origSdl,'CA')||cmdbGet(sidKey,'CA');
+      const ca = get('CA')||sdlGet(origSdl,'CA')||cmdbGet(sidKey,'Aging Category');
       const updateTeam = get('Update Team')||sdlGet(origSdl,'Update Team')||cmdbGet(sidKey,'Update Team');
       gdocRowsOut.push([mcArea,mc25,rSid,sn,statusVal,ht,previousOutage,permGen(sidKey),sc,ss,t2,p0,vv,vi,gensetDeploy,additionalMCGenset,fo,rs,ca,updateTeam]);
     }
