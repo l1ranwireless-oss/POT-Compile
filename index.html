@@ -2207,24 +2207,33 @@ async function process() {
     // GDOC indexes every unfiltered segmentation row by its Site Id, independently of display filters.
     const remarkColIdx = outHeader.findIndex(header => norm(header) === norm('Remark'));
     const segmentationStatusColIdx = outHeader.findIndex(header => norm(header) === norm('Status'));
-    function gdocStatus(segRow, sidKey) {
+    function gdocStatus(segRow, sidKey, fallbackStatus) {
       const remark = remarkColIdx >= 0 ? String(segRow[remarkColIdx] ?? '').trim().toUpperCase() : '';
       const remarkStatuses = new Set(remark.match(/\b(?:UP|DOWN)\b/g) || []);
+      if (remark.includes('SUDAH UP') || remark.includes('ALREADY UP')) return 'UP';
       if (remarkStatuses.size === 1) return remarkStatuses.values().next().value;
       if (segmentationStatusColIdx >= 0) {
         const status = String(segRow[segmentationStatusColIdx] ?? '').trim().toUpperCase();
         if (status === 'UP' || status === 'DOWN') return status;
       }
+      if (fallbackStatus === 'UP' || fallbackStatus === 'DOWN') return fallbackStatus;
       return segSiteIdSet.has(sidKey) ? 'DOWN' : 'UP';
     }
     const gdocSites = new Map();
-    for (const segRow of segRowsForGDOC) {
-      const sidRaw = segRow[siteColIdx];
+    const expectedGdocSiteIds = new Set();
+    for (let i = 0; i < sdlData.length; i++) {
+      const potRow = sdlData[i];
+      const sidRaw = String(potRow[sdlSiteIdx] ?? '').trim();
       const sidKey = siteKeyFn(sidRaw);
       if (!sidKey) continue;
-      const potRow = sdlSideMap.get(String(segRow[keyColIdx] ?? '') + '||' + sidKey)
-        || sdlBySiteId.get(sidKey)
-        || null;
+      expectedGdocSiteIds.add(sidKey);
+      const segRow = segRowsForGDOC[i] || Array(outHeader.length).fill('');
+      const outputSiteKey = siteKeyFn(segRow[siteColIdx]);
+      if (outputSiteKey && outputSiteKey !== sidKey) {
+        throw new Error(`Site ID tidak sejajar antara POT dan output segmentation pada baris ${i + 1}`);
+      }
+      if (!String(segRow[siteColIdx] ?? '').trim()) segRow[siteColIdx] = sidRaw;
+      if (keyColIdx >= 0 && !String(segRow[keyColIdx] ?? '').trim()) segRow[keyColIdx] = potRow[sdlKeyIdx] ?? '';
       const key = String(potRow?.[sdlKeyIdx] ?? segRow[keyColIdx] ?? '');
       const match = key.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/);
       const snapshotTime = match ? `${match[1]} ${match[2]}` : key;
@@ -2232,10 +2241,20 @@ async function process() {
       if (!previous || snapshotTime.localeCompare(previous.snapshotTime) >= 0) {
         gdocSites.set(sidKey, {
           potRow,
+          siteId: sidRaw,
           segRow,
-          status: gdocStatus(segRow, sidKey) === 'DOWN' ? 'DOWN' : 'UP',
+          status: gdocStatus(segRow, sidKey, statusByRow[i]) === 'DOWN' ? 'DOWN' : 'UP',
           snapshotTime
         });
+      }
+    }
+    const missingGdocSiteIds = [...expectedGdocSiteIds].filter(sidKey => !gdocSites.has(sidKey));
+    if (missingGdocSiteIds.length) {
+      throw new Error(`GDOC kehilangan ${missingGdocSiteIds.length} Site ID dari POT: ${missingGdocSiteIds.slice(0, 10).join(', ')}`);
+    }
+    for (const [sidKey, site] of gdocSites) {
+      if (site.status !== 'UP' && site.status !== 'DOWN') {
+        throw new Error(`Status GDOC tidak valid untuk Site ID ${sidKey}`);
       }
     }
     const latestDownRows = Array.from(gdocSites.values()).filter(site => site.status === 'DOWN');
@@ -2257,7 +2276,7 @@ async function process() {
     for (const [sidKey, site] of gdocSites) {
       const potRow = site.potRow;
       const segRow = site.segRow;
-      const rSid = String(segRow[siteColIdx] ?? '').trim();
+      const rSid = site.siteId;
       const statusVal = site.status;
       const get = column => {
         const idx = outHeader.indexOf(column);
@@ -2287,6 +2306,12 @@ async function process() {
       const ca = get('CA')||sdlGet(origSdl,'CA')||cmdbGet(sidKey,'CA');
       const updateTeam = get('Update Team')||sdlGet(origSdl,'Update Team')||cmdbGet(sidKey,'Update Team');
       gdocRowsOut.push([mcArea,mc25,rSid,sn,statusVal,ht,previousOutage,permGen(sidKey),sc,ss,t2,p0,vv,vi,gensetDeploy,additionalMCGenset,fo,rs,ca,updateTeam]);
+    }
+    const gdocOutputSiteIds = new Set(gdocRowsOut.slice(1).map(row => siteKeyFn(row[GDOC_IDX.SITE_ID])).filter(Boolean));
+    const missingGdocOutputSiteIds = [...expectedGdocSiteIds].filter(sidKey => !gdocOutputSiteIds.has(sidKey));
+    const invalidGdocOutputStatuses = gdocRowsOut.slice(1).filter(row => !['UP', 'DOWN'].includes(String(row[GDOC_IDX.STATUS] ?? '').trim().toUpperCase()));
+    if (missingGdocOutputSiteIds.length || invalidGdocOutputStatuses.length) {
+      throw new Error(`Validasi GDOC gagal: ${missingGdocOutputSiteIds.length} Site ID hilang, ${invalidGdocOutputStatuses.length} status kosong/tidak valid`);
     }
 
     /* ═══ SUMMARY — pass summaryRows ═══ */
