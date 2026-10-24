@@ -1429,6 +1429,22 @@ function deriveGensetLabel(sidKey, gdocGensetRaw, segLookup, segHeader) {
   return 'Genset Not Running';
 }
 
+function getSummaryTransportOutage(sidKey, segLookup, segHeader) {
+  const cmdbTransport = String(cmdbGet(sidKey, 'Transport Outage') ?? '').trim();
+  if (cmdbTransport) return cmdbTransport;
+  const rows = segLookup.get(sidKey) || [];
+  const transportHeader = autoMatch('Transport Outage', segHeader);
+  if (!transportHeader) return '';
+  const transportIdx = segHeader.indexOf(transportHeader);
+  return dedupeValues(rows.map(row => row[transportIdx]).filter(value => value != null && String(value).trim() !== '').join(','), ', ');
+}
+
+function getSummarySuperSiteProgram(sidKey) {
+  const program = String(cmdbGet(sidKey, 'Program') ?? '').trim();
+  if (!program || norm(program) === norm('Istimewa') || ['NO', 'N/A', '-'].includes(program.toUpperCase())) return '';
+  return program;
+}
+
 /* ═══════════════ BUILD SUMMARY ═══════════════ */
 function buildSummaryFromGDOCPG(params) {
   const { gdocRows, pgRowsOut, summaryRows, targetMC, siteKeyFn, powerAlarmSites, segLookup, segHeader } = params;
@@ -1460,12 +1476,12 @@ function buildSummaryFromGDOCPG(params) {
     const nid = siteKeyFn(sid);
     downSites.push({
       sid, nid,
-      name: String(r[GDOC_IDX.SITE_NAME] || '').trim() || sid,
+      name: String(r[GDOC_IDX.SITE_NAME] || cmdbGet(nid, 'Site Name*') || '').trim() || sid,
       mcArea: String(cmdbGet(nid, 'MC Cluster') || r[GDOC_IDX.MC_AREA] || '').trim(),
       hubType: String(r[GDOC_IDX.HUB_TYPE] || '').trim(),
-      transport: String(r[GDOC_IDX.TRANSPORT] || '').trim(),
+      transport: getSummaryTransportOutage(nid, segLookup, segHeader),
       gdocGenset: String(r[GDOC_IDX.GENSET] || '').trim(),
-      superSites: String(r[GDOC_IDX.SUPER_SITES] || '').trim(),
+      superSiteProgram: getSummarySuperSiteProgram(nid),
       traffic: String(r[GDOC_IDX.TRAFFIC] || '').trim(),
       p0: String(r[GDOC_IDX.P0] || '').trim(),
       vvip: String(r[GDOC_IDX.VVIP] || '').trim(),
@@ -1549,8 +1565,7 @@ function buildSummaryFromGDOCPG(params) {
     if (vvip === 'YES' || vvip === 'VVIP' || vip === 'YES' || vip === 'VIP') cats.push('vip');
     const traffic = (site.traffic || '').toUpperCase().trim();
     if (traffic.includes('2TB') || traffic === 'YES') cats.push('traffic');
-    const ss = (site.superSites || '').toUpperCase().trim();
-    if (ss === 'YES') cats.push('super');
+    if (site.superSiteProgram) cats.push('super');
     return cats;
   }
   
