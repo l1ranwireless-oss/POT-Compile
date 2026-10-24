@@ -461,6 +461,7 @@
       <span>Source: Summary Report + GDOC + PG + CMDB</span>
       <span id="sum-meta-mc">MC: -</span>
       <span id="sum-meta-down">Down: -</span>
+      <span id="sum-meta-up">UP: -</span>
       <span id="sum-meta-alarm">Alarm: -</span>
     </div>
     <div class="copy-area">
@@ -1429,7 +1430,19 @@ function deriveGensetLabel(sidKey, gdocGensetRaw, segLookup, segHeader) {
   return 'Genset Not Running';
 }
 
-function getSummaryTransportOutage(sidKey, segLookup, segHeader) {
+function getSummaryTransportOutage(sidKey, outputSegRowsBySiteId, outputSegHeader, segLookup, segHeader) {
+  const outputTransportHeader = autoMatch('Transport Outage', outputSegHeader);
+  if (outputTransportHeader) {
+    const outputTransportIdx = outputSegHeader.indexOf(outputTransportHeader);
+    const outputTransport = dedupeValues(
+      (outputSegRowsBySiteId.get(sidKey) || [])
+        .map(row => row[outputTransportIdx])
+        .filter(value => value != null && String(value).trim() !== '')
+        .join(','),
+      ', '
+    );
+    if (outputTransport) return outputTransport;
+  }
   const cmdbTransport = String(cmdbGet(sidKey, 'Transport Outage') ?? '').trim();
   if (cmdbTransport) return cmdbTransport;
   const rows = segLookup.get(sidKey) || [];
@@ -1452,7 +1465,10 @@ function getSummarySuperSiteProgram(sidKey) {
 
 /* ═══════════════ BUILD SUMMARY ═══════════════ */
 function buildSummaryFromGDOCPG(params) {
-  const { gdocRows, pgRowsOut, summaryRows, targetMC, siteKeyFn, powerAlarmSites, segLookup, segHeader } = params;
+  const {
+    gdocRows, pgRowsOut, summaryRows, targetMC, siteKeyFn, powerAlarmSites,
+    segLookup, segHeader, segmentationRows, segmentationHeader
+  } = params;
   
   const pgData = pgRowsOut.slice(2);
   const pgFirst = pgData[0] || [];
@@ -1472,28 +1488,53 @@ function buildSummaryFromGDOCPG(params) {
     }
   }
   
+  const outputSiteIdHeader = segmentationHeader.find(header => norm(header) === norm('Site Id'));
+  if (!outputSiteIdHeader) throw new Error('Kolom Site Id tidak ditemukan pada output segmentation untuk INCIDENT SUMMARY');
+  const outputSiteIdIdx = segmentationHeader.indexOf(outputSiteIdHeader);
+  const outputSegRowsBySiteId = new Map();
+  for (const row of segmentationRows) {
+    const sidKey = siteKeyFn(row[outputSiteIdIdx]);
+    if (!sidKey) continue;
+    const rows = outputSegRowsBySiteId.get(sidKey);
+    if (rows) rows.push(row);
+    else outputSegRowsBySiteId.set(sidKey, [row]);
+  }
+  const outputStatusHeader = segmentationHeader.find(header => norm(header) === norm('Status'));
+  const outputStatusIdx = outputStatusHeader ? segmentationHeader.indexOf(outputStatusHeader) : -1;
   const gdocData = gdocRows.slice(1);
+  const allSites = [];
   const downSites = [];
   for (const r of gdocData) {
-    if (String(r[GDOC_IDX.STATUS] ?? '').trim().toUpperCase() !== 'DOWN') continue;
     const sid = String(r[GDOC_IDX.SITE_ID] || '').trim();
     if (!sid) continue;
     const nid = siteKeyFn(sid);
+    const matchedOutputRows = outputSegRowsBySiteId.get(nid) || [];
+    const gdocStatus = String(r[GDOC_IDX.STATUS] ?? '').trim().toUpperCase();
+    const outputStatus = outputStatusIdx >= 0
+      ? String(matchedOutputRows.find(row => ['UP', 'DOWN'].includes(String(row[outputStatusIdx] ?? '').trim().toUpperCase()))?.[outputStatusIdx] ?? '').trim().toUpperCase()
+      : '';
+    const status = ['UP', 'DOWN'].includes(gdocStatus)
+      ? gdocStatus
+      : (outputStatus || (segLookup.has(nid) ? 'DOWN' : 'UP'));
     const cmdbVIP = cmdbGet(nid, 'Is VIP');
-    downSites.push({
+    const site = {
       sid, nid,
+      status,
       name: getSummaryCMDBValue(nid, 'Site Name*', r[GDOC_IDX.SITE_NAME]) || sid,
       mcArea: getSummaryCMDBValue(nid, 'MC Cluster', r[GDOC_IDX.MC_AREA]),
       hubType: getSummaryCMDBValue(nid, 'HUB Type', r[GDOC_IDX.HUB_TYPE]),
-      transport: getSummaryTransportOutage(nid, segLookup, segHeader),
+      transport: getSummaryTransportOutage(nid, outputSegRowsBySiteId, segmentationHeader, segLookup, segHeader),
       gdocGenset: String(r[GDOC_IDX.GENSET] || '').trim(),
       superSiteProgram: getSummarySuperSiteProgram(nid),
       traffic: getSummaryCMDBValue(nid, 'Traffic Class', r[GDOC_IDX.TRAFFIC]),
       p0: getSummaryCMDBValue(nid, 'P0 Sites', r[GDOC_IDX.P0]),
       vvip: String(r[GDOC_IDX.VVIP] || cmdbVIP || '').trim(),
       vip: getSummaryCMDBValue(nid, 'Is VIP', r[GDOC_IDX.VIP]),
-    });
+    };
+    allSites.push(site);
+    if (status === 'DOWN') downSites.push(site);
   }
+  const upSites = allSites.filter(site => site.status === 'UP');
   
   const impactedMCStats = new Map();
   const unmatchedMCs = new Set();
@@ -1630,6 +1671,7 @@ function buildSummaryFromGDOCPG(params) {
   
   return {
     agingStr, startTime, updateTime, totalDown, totalDownSource, totalSiteMC, pctDown,
+    allSiteCount: allSites.length, upSites,
     powerAlarmCount, powerAlarmMcCount, powerAlarmByMC,
     categoryResults, mcAbove25List, targetMC: mcLabel, impactedMCs: mcLabels
   };
@@ -1646,12 +1688,26 @@ function generateSummaryText(summary) {
     lines.push('');
     lines.push(`Sites down / total site under MC Impacted: ${summary.totalDown}/${summary.totalSiteMC} (${summary.pctDown.toFixed(2)}%)`);
     lines.push(`Total Sites Down under impacted MC Cluster (${summary.targetMC}): ${summary.totalDown} out of ${summary.totalSiteMC} (${summary.pctDown.toFixed(2)}%)`);
+    lines.push(`Site ID in GDOC: ${summary.allSiteCount} · DOWN: ${summary.allSiteCount - summary.upSites.length} · UP: ${summary.upSites.length}`);
     lines.push(`Sites with Power Alarm: ${summary.powerAlarmCount}`);
     const alarmMCs = summary.impactedMCs || [];
     if (alarmMCs.length) {
       for (const mc of alarmMCs) lines.push(`${mc} : ${(summary.powerAlarmByMC && summary.powerAlarmByMC.get(mc)) || 0}`);
     } else {
       lines.push(`${summary.targetMC} : ${summary.powerAlarmMcCount}`);
+    }
+    lines.push('');
+    lines.push(`Sites UP (Site tidak ada di Segmentation Info / sudah pulih): ${summary.upSites.length}`);
+    if (summary.upSites.length) {
+      for (const site of summary.upSites) {
+        const parts = [site.sid];
+        if (site.name && site.name !== site.sid) parts.push(site.name);
+        if (site.transport) parts.push(`(${site.transport})`);
+        parts.push('(UP)');
+        lines.push(parts.join(' '));
+      }
+    } else {
+      lines.push('-');
     }
     lines.push('');
     lines.push('Sites Down Priority : ');
@@ -1714,6 +1770,7 @@ function renderSummary(summary) {
     document.getElementById('summary-text').value = text;
     document.getElementById('sum-meta-mc').textContent = `MC: ${summary.targetMC || '-'}`;
     document.getElementById('sum-meta-down').textContent = `Down: ${summary.totalDown}/${summary.totalSiteMC} (${summary.pctDown.toFixed(2)}%)`;
+    document.getElementById('sum-meta-up').textContent = `UP: ${summary.upSites.length}`;
     document.getElementById('sum-meta-alarm').textContent = `Alarm: ${summary.powerAlarmCount}`;
     document.getElementById('summary-card').classList.add('show');
     document.getElementById('summary-card').scrollIntoView({behavior:'smooth', block:'start'});
@@ -2237,7 +2294,8 @@ async function process() {
       gdocRows: gdocRowsOut, pgRowsOut,
       summaryRows,
       targetMC, siteKeyFn,
-      powerAlarmSites: zipFoundSites, segLookup, segHeader
+      powerAlarmSites: zipFoundSites, segLookup, segHeader,
+      segmentationRows: segRowsForGDOC, segmentationHeader: outHeader
     });
     renderSummary(summary);
 
