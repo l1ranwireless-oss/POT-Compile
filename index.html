@@ -1893,10 +1893,13 @@ async function process() {
     if (!segSiteIdSet.size) throw new Error('Segmentation tidak memiliki Site Id yang dapat diproses');
 
     const sdlSideMap = new Map();
+    const sdlBySiteId = new Map();
     for (const sdlRow of sdlData) {
       const key = String(sdlRow[sdlKeyIdx] ?? '');
       const sidKey = siteKeyFn(sdlRow[sdlSiteIdx]);
-      if (key && sidKey) sdlSideMap.set(key + '||' + sidKey, sdlRow);
+      if (!sidKey) continue;
+      sdlBySiteId.set(sidKey, sdlRow);
+      if (key) sdlSideMap.set(key + '||' + sidKey, sdlRow);
     }
 
     function sdlGet(sdlRow, alias) {
@@ -2049,6 +2052,7 @@ async function process() {
     const keyColIdx = outHeader.indexOf('Key');
     const siteColIdx = outHeader.findIndex(header => norm(header) === norm('Site Id'));
     const statusColIdx = outHeader.indexOf('Status');
+    if (siteColIdx < 0) throw new Error('Kolom Site Id tidak ditemukan pada output segmentation');
     const dataPart = segRowsOut.slice(1);
     dataPart.sort((a,b) => {
       const ka = String(a[keyColIdx]??''), kb = String(b[keyColIdx]??'');
@@ -2122,7 +2126,7 @@ async function process() {
       pgRowsOut.push([snapshotTime,'KSMP',mcName,cmdbStats.totalSiteMC,bT,mT,sT,cC,eT,td,pd,cmdbStats.bigMedYes,cmdbStats.critYes,cmdbStats.bigMedNo,cmdbStats.critNo,'','','','','','',bT,mT,sC,sNC,eC,eNC,mC,bC,td,yn]);
     }
 
-    // GDOC follows the same unfiltered POT-derived rows used to build the segmentation sheet.
+    // GDOC indexes every unfiltered segmentation row by its Site Id, independently of display filters.
     const remarkColIdx = outHeader.findIndex(header => norm(header) === norm('Remark'));
     const segmentationStatusColIdx = outHeader.findIndex(header => norm(header) === norm('Status'));
     function gdocStatus(segRow, sidKey) {
@@ -2136,13 +2140,14 @@ async function process() {
       return segSiteIdSet.has(sidKey) ? 'DOWN' : 'UP';
     }
     const gdocSites = new Map();
-    for (let i = 0; i < sdlData.length; i++) {
-      const potRow = sdlData[i];
-      const segRow = segRowsForGDOC[i];
-      if (!segRow) continue;
-      const sidKey = siteKeyFn(segRow[siteColIdx]);
+    for (const segRow of segRowsForGDOC) {
+      const sidRaw = segRow[siteColIdx];
+      const sidKey = siteKeyFn(sidRaw);
       if (!sidKey) continue;
-      const key = String(potRow[sdlKeyIdx] ?? '');
+      const potRow = sdlSideMap.get(String(segRow[keyColIdx] ?? '') + '||' + sidKey)
+        || sdlBySiteId.get(sidKey)
+        || null;
+      const key = String(potRow?.[sdlKeyIdx] ?? segRow[keyColIdx] ?? '');
       const match = key.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/);
       const snapshotTime = match ? `${match[1]} ${match[2]}` : key;
       const previous = gdocSites.get(sidKey);
@@ -2150,14 +2155,14 @@ async function process() {
         gdocSites.set(sidKey, {
           potRow,
           segRow,
-          status: gdocStatus(segRow, sidKey),
+          status: gdocStatus(segRow, sidKey) === 'DOWN' ? 'DOWN' : 'UP',
           snapshotTime
         });
       }
     }
     const latestDownRows = Array.from(gdocSites.values()).filter(site => site.status === 'DOWN');
     const latestUpCount = gdocSites.size - latestDownRows.length;
-    log(`GDOC: ${gdocSites.size} unique POT Site ID · DOWN=${latestDownRows.length} · UP=${latestUpCount}`);
+    log(`GDOC: ${gdocSites.size} unique segmentation Site ID · DOWN=${latestDownRows.length} · UP=${latestUpCount}`);
     const gdocRowsOut = [GDOC_COLS.slice()];
     const mcDP = cmdbStats.totalSiteMC ? (latestDownRows.length/cmdbStats.totalSiteMC) : 0;
     const mc25 = mcDP > 0.25 ? 'YES' : 'NO';
