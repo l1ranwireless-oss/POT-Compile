@@ -566,8 +566,7 @@ const GDOC_HEADER_COLORS = [...Array(9).fill('00E676'),...Array(5).fill('5BC0DE'
 const GDOC_IDX = {MC_AREA:0,MC_25:1,SITE_ID:2,SITE_NAME:3,STATUS:4,HUB_TYPE:5,TRANSPORT:6,GENSET:7,SITE_CLASS:8,SUPER_SITES:9,TRAFFIC:10,P0:11,VVIP:12,VIP:13,GENSET_DEPLOY:14,ADDITIONAL_MC:15,FME:16,RTS:17,CA:18,UPDATE_TEAM:19};
 const PG_IDX = {TIME:0,REGION:1,MC_NAME:2,TOTAL_MC:3,BIG_DOWN:4,MEDIUM_DOWN:5,SMALL_DOWN:6,CRITICAL_DOWN:7,END_DOWN:8,TOTAL_DOWN:9,PCT_DOWN:10};
 
-const CMDB_NEEDED_COLS = ['Site Id','Site Name*','HUB Type','Site Priority Label','Has Generator','DG Status','Traffic Class','P0 Sites','Is VIP','FM Office*','Rts Name','Rts Id','MC Cluster','Is Hub','Program','Previous Status Outage','Genset Deploy Status','Additional MC>25% Portable Genset run','CA','Update Team','Transport Outage'];
-const CMDB_NEEDED_IDX = {}; CMDB_NEEDED_COLS.forEach((a,i)=>{CMDB_NEEDED_IDX[a]=i;});
+const CMDB_HEADER_DETECTION_COLS = ['Site Id','Site Name*','HUB Type','Site Priority Label','Has Generator','DG Status','Traffic Class','P0 Sites','Is VIP','FM Office*','Rts Name','Rts Id','MC Cluster','Is Hub','Program','Previous Status Outage','Genset Deploy Status','Additional MC>25% Portable Genset run','CA','Update Team','Transport Outage'];
 const CMDB_CRITICAL_COLS = ['Site Id', 'MC Cluster', 'HUB Type', 'Site Priority Label'];
 
 const COL_ALIASES = {
@@ -605,6 +604,8 @@ const COL_ALIASES = {
   'Update Team': ['Update Team','Team Update'],
   'Transport Outage': ['Transport Outage','Transport Status']
 };
+const CMDB_NEEDED_COLS = [...new Set([...CMDB_HEADER_DETECTION_COLS, ...SEG_COLS])];
+const CMDB_NEEDED_IDX = {}; CMDB_NEEDED_COLS.forEach((a,i)=>{CMDB_NEEDED_IDX[a]=i;});
 
 const SNAPSHOT_COLORS = [{fill:'DBEAFE',font:'1E40AF'},{fill:'D1FAE5',font:'065F46'},{fill:'FEF3C7',font:'92400E'},{fill:'FFEDD5',font:'9A3412'},{fill:'FEE2E2',font:'991B1B'},{fill:'F3E8FF',font:'6B21A8'},{fill:'FFE4E6',font:'9F1239'},{fill:'CCFBF1',font:'134E4A'}];
 const SDL_SOURCE_MAP = {'Key':'Key','Site Id':'Site Id','First Occurred(NT)':'Last Occurred(NT)','Last Occurred(NT)':'Last Occurred(NT)','Alarm':'Alarm','Alarm Identifier':'Alarm Identifier','BTS Name':'Site Name','Hub Type':'Hub Type','City':'City','MC':'MC','Area':'Area','Province':'Province','VIP':'VIP','Impact Category':'Impact Category','TT':'TT','WO':'WO','Power Alarm Name':'Power Alarm Name','Power Alarm Time':'Power Alarm Time','Mains Failure (Exal & PMS) Last Occur Time':'Mains Failure (Exal & PMS) Last Occur Time','Router Power Alarm':'Router Power Alarm','Router Power Alarm Time':'Router Power Alarm Time','Transport Outage':'Transport Outage','Actual Battery Backup Duration/(Minute)':'Actual Battery Backup Duration/(Minute)','Remark':'Remark'};
@@ -704,7 +705,7 @@ function detectCMDBHeader(rows, scan = 25) {
     const r = rows[i];
     if (!r || !r.length) continue;
     let score = 0;
-    for (const alias of CMDB_NEEDED_COLS) if (autoMatch(alias, r)) score++;
+    for (const alias of CMDB_HEADER_DETECTION_COLS) if (autoMatch(alias, r)) score++;
     if (r.some(h => norm(h).includes('site') && norm(h).includes('id'))) score += 20;
     if (r.some(h => norm(h).includes('mc') && (norm(h).includes('cluster') || norm(h).includes('area')))) score += 10;
     if (r.some(h => norm(h).includes('hub') && norm(h).includes('type'))) score += 10;
@@ -1176,7 +1177,9 @@ function padRow(row, len) {
 function autoMatch(targetCol, headers) {
   if (!headers || !headers.length) return null;
   const nt = norm(targetCol); if (!nt) return null;
-  const aliases = COL_ALIASES[targetCol] || [];
+  const aliases = Object.entries(COL_ALIASES)
+    .filter(([name]) => norm(name) === nt)
+    .flatMap(([, values]) => values);
   for (const a of aliases) { const na = norm(a); const f = headers.find(h => norm(h) === na); if (f) return f; }
   let f = headers.find(h => norm(h) === nt); if (f) return f;
   for (const a of aliases) {
@@ -1785,6 +1788,8 @@ function renderSummary(summary) {
 async function process() {
   if (processing || cmdbLoading || !potFile || !segFile || !cmdbFile || CMDB_CACHE.meta.sites === 0) return;
   processing = true;
+  lastOutputBlob = null;
+  document.getElementById('result-card').classList.remove('show');
   const filterMode = document.getElementById('filter-status').value;
   const headerMode = document.getElementById('header-mode').value;
   const useNormSite = document.getElementById('norm-siteid').checked;
@@ -1875,7 +1880,7 @@ async function process() {
     doneStage('stage-seg', segRowsRaw.length + ' SEG · ' + (cmdbRowsRaw ? cmdbRowsRaw.length + ' CMDB' : (CMDB_CACHE.meta.sites > 0 ? CMDB_CACHE.meta.sites + ' cached' : '-')));
     await sleep(100);
 
-    const siteKeyFn = useNormSite ? normSiteId : (s => String(s??'').trim());
+    const siteKeyFn = useNormSite ? normSiteId : (s => String(s??'').trim().toUpperCase());
 
     /* 3. ZIP */
     startStage('stage-zip');
@@ -2048,7 +2053,8 @@ async function process() {
       if (key === norm('Genset')) return cmdbGet(sidKey, 'Has Generator') || cmdbGet(sidKey, 'DG Status');
       if (key === norm('MC')) return cmdbGet(sidKey, 'MC Cluster');
       if (key === norm('VIP')) return cmdbGet(sidKey, 'Is VIP');
-      return '';
+      const cmdbColumn = autoMatch(column, CMDB_NEEDED_COLS);
+      return cmdbColumn ? cmdbGet(sidKey, cmdbColumn) : '';
     }
 
     let outHeader;
@@ -2060,7 +2066,8 @@ async function process() {
           if (!outHeader.some(h => norm(h) === norm(tc))) outHeader.push(tc);
         }
       }
-      outHeader.push('Status','Recovery Note');
+      if (!outHeader.some(header => norm(header) === norm('Status'))) outHeader.push('Status');
+      if (!outHeader.some(header => norm(header) === norm('Recovery Note'))) outHeader.push('Recovery Note');
     } else {
       outHeader = SEG_COLS.slice().concat(STATUS_COLS);
     }
@@ -2077,8 +2084,8 @@ async function process() {
       if (useDyn) {
         rowOut = [];
         for (const hCol of outHeader) {
-          if (hCol === 'Status') { rowOut.push(status); continue; }
-          if (hCol === 'Recovery Note') { rowOut.push(recoveryNote); continue; }
+          if (norm(hCol) === norm('Status')) { rowOut.push(status); continue; }
+          if (norm(hCol) === norm('Recovery Note')) { rowOut.push(recoveryNote); continue; }
           const sdlIdx = sdlHeader.indexOf(hCol);
           if (sdlIdx >= 0) { rowOut.push(sdlRow[sdlIdx] ?? ''); continue; }
           const segKey = Object.keys(segColMap).find(k => norm(k) === norm(hCol));
@@ -2127,9 +2134,9 @@ async function process() {
       }
     }
 
-    const keyColIdx = outHeader.indexOf('Key');
+    const keyColIdx = outHeader.findIndex(header => norm(header) === norm('Key'));
     const siteColIdx = outHeader.findIndex(header => norm(header) === norm('Site Id'));
-    const statusColIdx = outHeader.indexOf('Status');
+    const statusColIdx = outHeader.findIndex(header => norm(header) === norm('Status'));
     if (siteColIdx < 0) throw new Error('Kolom Site Id tidak ditemukan pada output segmentation');
     const dataPart = segRowsOut.slice(1);
     dataPart.sort((a,b) => {
@@ -2208,14 +2215,14 @@ async function process() {
     const remarkColIdx = outHeader.findIndex(header => norm(header) === norm('Remark'));
     const segmentationStatusColIdx = outHeader.findIndex(header => norm(header) === norm('Status'));
     function gdocStatus(segRow, sidKey, fallbackStatus) {
-      const remark = remarkColIdx >= 0 ? String(segRow[remarkColIdx] ?? '').trim().toUpperCase() : '';
-      const remarkStatuses = new Set(remark.match(/\b(?:UP|DOWN)\b/g) || []);
-      if (remark.includes('SUDAH UP') || remark.includes('ALREADY UP')) return 'UP';
-      if (remarkStatuses.size === 1) return remarkStatuses.values().next().value;
       if (segmentationStatusColIdx >= 0) {
         const status = String(segRow[segmentationStatusColIdx] ?? '').trim().toUpperCase();
         if (status === 'UP' || status === 'DOWN') return status;
       }
+      const remark = remarkColIdx >= 0 ? String(segRow[remarkColIdx] ?? '').trim().toUpperCase() : '';
+      const remarkStatuses = new Set(remark.match(/\b(?:UP|DOWN)\b/g) || []);
+      if (remark.includes('SUDAH UP') || remark.includes('ALREADY UP')) return 'UP';
+      if (remarkStatuses.size === 1) return remarkStatuses.values().next().value;
       if (fallbackStatus === 'UP' || fallbackStatus === 'DOWN') return fallbackStatus;
       return segSiteIdSet.has(sidKey) ? 'DOWN' : 'UP';
     }
@@ -2300,7 +2307,7 @@ async function process() {
       const rSid = site.siteId;
       const statusVal = site.status;
       const get = column => {
-        const idx = outHeader.indexOf(column);
+        const idx = outHeader.findIndex(header => norm(header) === norm(column));
         return idx >= 0 ? segRow[idx] ?? '' : '';
       };
       const origSdl = potRow;
@@ -2416,6 +2423,57 @@ async function process() {
     XLSX.utils.book_append_sheet(outWb, wsGDOC, 'GDOC');
 
     const buf = XLSX.write(outWb, {type:'array', bookType:'xlsx', cellStyles:true});
+    const validationWb = XLSX.read(buf, {type:'array', cellDates:false, cellNF:false, cellText:false});
+    const validationSegRows = sheetToAOA(validationWb, 'bcp_segmentation_export_sheet');
+    const validationGdocRows = sheetToAOA(validationWb, 'GDOC');
+    if (!validationSegRows?.length || !validationGdocRows?.length) {
+      throw new Error('Validasi file gagal: sheet segmentation atau GDOC tidak ditemukan');
+    }
+    const findColumn = (header, name) => header.findIndex(value => norm(value) === norm(name));
+    const validationSegSiteIdx = findColumn(validationSegRows[0], 'Site Id');
+    const validationSegStatusIdx = findColumn(validationSegRows[0], 'Status');
+    const validationSegKeyIdx = findColumn(validationSegRows[0], 'Key');
+    const validationGdocSiteIdx = findColumn(validationGdocRows[0], 'Site ID');
+    const validationGdocStatusIdx = findColumn(validationGdocRows[0], 'Current Status Site (Up/Down)');
+    if ([validationSegSiteIdx, validationSegStatusIdx, validationGdocSiteIdx, validationGdocStatusIdx].some(index => index < 0)) {
+      throw new Error('Validasi file gagal: header Site Id atau Status tidak ditemukan pada sheet segmentation/GDOC');
+    }
+    const expectedSegmentationStatus = new Map();
+    for (let rowIndex = 1; rowIndex < validationSegRows.length; rowIndex++) {
+      const row = validationSegRows[rowIndex];
+      const siteId = String(row[validationSegSiteIdx] ?? '').trim();
+      const siteKey = siteKeyFn(siteId);
+      if (!siteKey) continue;
+      const status = String(row[validationSegStatusIdx] ?? '').trim().toUpperCase();
+      if (status !== 'UP' && status !== 'DOWN') {
+        throw new Error(`Validasi file gagal: Status segmentation tidak valid untuk Site ID ${siteId}`);
+      }
+      const key = validationSegKeyIdx >= 0 ? String(row[validationSegKeyIdx] ?? '') : '';
+      const match = key.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/);
+      const snapshotTime = match ? `${match[1]} ${match[2]}` : key || String(rowIndex).padStart(10, '0');
+      const previous = expectedSegmentationStatus.get(siteKey);
+      if (!previous || snapshotTime.localeCompare(previous.snapshotTime) >= 0) {
+        expectedSegmentationStatus.set(siteKey, {siteId, status, snapshotTime});
+      }
+    }
+    const actualGdocStatus = new Map();
+    for (const row of validationGdocRows.slice(1)) {
+      const siteKey = siteKeyFn(row[validationGdocSiteIdx]);
+      if (!siteKey) continue;
+      const status = String(row[validationGdocStatusIdx] ?? '').trim().toUpperCase();
+      if (status !== 'UP' && status !== 'DOWN') {
+        throw new Error(`Validasi file gagal: Status GDOC tidak valid untuk Site ID ${row[validationGdocSiteIdx]}`);
+      }
+      actualGdocStatus.set(siteKey, status);
+    }
+    const missingExportSiteIds = [...expectedGdocSiteIds].filter(siteKey => !actualGdocStatus.has(siteKey));
+    const missingSegmentationSiteIds = [...expectedSegmentationStatus.keys()].filter(siteKey => !actualGdocStatus.has(siteKey));
+    const mismatchedUpSiteIds = [...expectedSegmentationStatus]
+      .filter(([siteKey, expected]) => expected.status === 'UP' && actualGdocStatus.get(siteKey) !== 'UP')
+      .map(([, expected]) => expected.siteId);
+    if (missingExportSiteIds.length || missingSegmentationSiteIds.length || mismatchedUpSiteIds.length) {
+      throw new Error(`Validasi file gagal: ${missingExportSiteIds.length} Site ID POT, ${missingSegmentationSiteIds.length} Site ID segmentation hilang; ${mismatchedUpSiteIds.length} Site ID berstatus UP tidak tercermin di GDOC`);
+    }
     lastOutputBlob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     doneStage('stage-excel', fmtBytes(lastOutputBlob.size));
 
