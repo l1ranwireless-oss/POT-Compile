@@ -2248,9 +2248,30 @@ async function process() {
         });
       }
     }
+    for (const segRow of segRowsOut.slice(1)) {
+      const sidRaw = String(segRow[siteColIdx] ?? '').trim();
+      const sidKey = siteKeyFn(sidRaw);
+      if (!sidKey) continue;
+      expectedGdocSiteIds.add(sidKey);
+      const key = String(segRow[keyColIdx] ?? '');
+      const match = key.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/);
+      const snapshotTime = match ? `${match[1]} ${match[2]}` : key;
+      const previous = gdocSites.get(sidKey);
+      if (!previous || snapshotTime.localeCompare(previous.snapshotTime) >= 0) {
+        gdocSites.set(sidKey, {
+          potRow: sdlSideMap.get(key + '||' + sidKey) || previous?.potRow || null,
+          siteId: sidRaw,
+          segRow,
+          status: gdocStatus(segRow, sidKey, segRow[segmentationStatusColIdx]),
+          snapshotTime
+        });
+      } else {
+        previous.siteId = sidRaw;
+      }
+    }
     const missingGdocSiteIds = [...expectedGdocSiteIds].filter(sidKey => !gdocSites.has(sidKey));
     if (missingGdocSiteIds.length) {
-      throw new Error(`GDOC kehilangan ${missingGdocSiteIds.length} Site ID dari POT: ${missingGdocSiteIds.slice(0, 10).join(', ')}`);
+      throw new Error(`GDOC kehilangan ${missingGdocSiteIds.length} Site ID dari POT/segmentation: ${missingGdocSiteIds.slice(0, 10).join(', ')}`);
     }
     for (const [sidKey, site] of gdocSites) {
       if (site.status !== 'UP' && site.status !== 'DOWN') {
