@@ -2004,6 +2004,7 @@ async function process() {
       pgRowsOut.push([snapshotTime,'KSMP',mcName,cmdbStats.totalSiteMC,bT,mT,sT,cC,eT,td,pd,cmdbStats.bigMedYes,cmdbStats.critYes,cmdbStats.bigMedNo,cmdbStats.critNo,'','','','','','',bT,mT,sC,sNC,eC,eNC,mC,bC,td,yn]);
     }
 
+    // GDOC uses every POT Site Down List row, independent of the segmentation display filter.
     const gdocSites = new Map();
     for (let i = 0; i < sdlData.length; i++) {
       const potRow = sdlData[i];
@@ -2017,12 +2018,14 @@ async function process() {
         gdocSites.set(sidKey, {
           potRow,
           segRow: segRowsForGDOC[i],
-          status: statusByRow[i] || 'UP',
+          status: segSiteIdSet.has(sidKey) ? 'DOWN' : 'UP',
           snapshotTime
         });
       }
     }
     const latestDownRows = Array.from(gdocSites.values()).filter(site => site.status === 'DOWN');
+    const latestUpCount = gdocSites.size - latestDownRows.length;
+    log(`GDOC: ${gdocSites.size} unique POT Site ID · DOWN=${latestDownRows.length} · UP=${latestUpCount}`);
     const gdocRowsOut = [GDOC_COLS.slice()];
     const mcDP = cmdbStats.totalSiteMC ? (latestDownRows.length/cmdbStats.totalSiteMC) : 0;
     const mc25 = mcDP > 0.25 ? 'YES' : 'NO';

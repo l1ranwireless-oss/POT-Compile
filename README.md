@@ -8,7 +8,7 @@ Pastikan Docker Engine dan Docker Compose plugin tersedia, lalu jalankan:
 sh deploy.sh
 ```
 
-Script membuat folder `dist/`, menyalin aplikasi, membangun image Nginx, dan menjalankan layanan. Buka `http://localhost:8080`. Port dapat diubah, misalnya `PORT=9000 sh deploy.sh`.
+Script membangun image Nginx langsung dari `index.html` terbaru dan menjalankan layanan. Buka `http://localhost:8080`. Port dapat diubah, misalnya `PORT=9000 sh deploy.sh`.
 
 ## Database CMDB
 

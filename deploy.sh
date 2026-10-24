@@ -14,8 +14,6 @@ if [ -z "${CMDB_API_TOKEN:-}" ]; then
   printf '%s\n' 'CMDB_API_TOKEN wajib diatur (minimal 32 karakter). Contoh: export CMDB_API_TOKEN="$(openssl rand -hex 32)"' >&2
   exit 1
 fi
-mkdir -p dist
-cp index.html dist/index.html
 docker compose up -d --build
 
 printf 'Aplikasi tersedia di http://localhost:%s\n' "${PORT:-8080}"
