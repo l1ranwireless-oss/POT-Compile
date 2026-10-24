@@ -1429,6 +1429,27 @@ function deriveGensetLabel(sidKey, gdocGensetRaw, segLookup, segHeader) {
   return 'Genset Not Running';
 }
 
+function getSummaryTransportOutage(sidKey, segLookup, segHeader) {
+  const cmdbTransport = String(cmdbGet(sidKey, 'Transport Outage') ?? '').trim();
+  if (cmdbTransport) return cmdbTransport;
+  const rows = segLookup.get(sidKey) || [];
+  const transportHeader = autoMatch('Transport Outage', segHeader);
+  if (!transportHeader) return '';
+  const transportIdx = segHeader.indexOf(transportHeader);
+  return dedupeValues(rows.map(row => row[transportIdx]).filter(value => value != null && String(value).trim() !== '').join(','), ', ');
+}
+
+function getSummaryCMDBValue(sidKey, field, fallback) {
+  const value = String(cmdbGet(sidKey, field) ?? '').trim();
+  return value || String(fallback ?? '').trim();
+}
+
+function getSummarySuperSiteProgram(sidKey) {
+  const program = String(cmdbGet(sidKey, 'Program') ?? '').trim();
+  if (!program || norm(program) === norm('Istimewa') || ['NO', 'N/A', '-'].includes(program.toUpperCase())) return '';
+  return program;
+}
+
 /* ═══════════════ BUILD SUMMARY ═══════════════ */
 function buildSummaryFromGDOCPG(params) {
   const { gdocRows, pgRowsOut, summaryRows, targetMC, siteKeyFn, powerAlarmSites, segLookup, segHeader } = params;
@@ -1458,18 +1479,19 @@ function buildSummaryFromGDOCPG(params) {
     const sid = String(r[GDOC_IDX.SITE_ID] || '').trim();
     if (!sid) continue;
     const nid = siteKeyFn(sid);
+    const cmdbVIP = cmdbGet(nid, 'Is VIP');
     downSites.push({
       sid, nid,
-      name: String(r[GDOC_IDX.SITE_NAME] || '').trim() || sid,
-      mcArea: String(cmdbGet(nid, 'MC Cluster') || r[GDOC_IDX.MC_AREA] || '').trim(),
-      hubType: String(r[GDOC_IDX.HUB_TYPE] || '').trim(),
-      transport: String(r[GDOC_IDX.TRANSPORT] || '').trim(),
+      name: getSummaryCMDBValue(nid, 'Site Name*', r[GDOC_IDX.SITE_NAME]) || sid,
+      mcArea: getSummaryCMDBValue(nid, 'MC Cluster', r[GDOC_IDX.MC_AREA]),
+      hubType: getSummaryCMDBValue(nid, 'HUB Type', r[GDOC_IDX.HUB_TYPE]),
+      transport: getSummaryTransportOutage(nid, segLookup, segHeader),
       gdocGenset: String(r[GDOC_IDX.GENSET] || '').trim(),
-      superSites: String(r[GDOC_IDX.SUPER_SITES] || '').trim(),
-      traffic: String(r[GDOC_IDX.TRAFFIC] || '').trim(),
-      p0: String(r[GDOC_IDX.P0] || '').trim(),
-      vvip: String(r[GDOC_IDX.VVIP] || '').trim(),
-      vip: String(r[GDOC_IDX.VIP] || '').trim(),
+      superSiteProgram: getSummarySuperSiteProgram(nid),
+      traffic: getSummaryCMDBValue(nid, 'Traffic Class', r[GDOC_IDX.TRAFFIC]),
+      p0: getSummaryCMDBValue(nid, 'P0 Sites', r[GDOC_IDX.P0]),
+      vvip: String(r[GDOC_IDX.VVIP] || cmdbVIP || '').trim(),
+      vip: getSummaryCMDBValue(nid, 'Is VIP', r[GDOC_IDX.VIP]),
     });
   }
   
@@ -1549,8 +1571,7 @@ function buildSummaryFromGDOCPG(params) {
     if (vvip === 'YES' || vvip === 'VVIP' || vip === 'YES' || vip === 'VIP') cats.push('vip');
     const traffic = (site.traffic || '').toUpperCase().trim();
     if (traffic.includes('2TB') || traffic === 'YES') cats.push('traffic');
-    const ss = (site.superSites || '').toUpperCase().trim();
-    if (ss === 'YES') cats.push('super');
+    if (site.superSiteProgram) cats.push('super');
     return cats;
   }
   
