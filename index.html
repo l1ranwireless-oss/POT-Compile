@@ -1439,6 +1439,11 @@ function getSummaryTransportOutage(sidKey, segLookup, segHeader) {
   return dedupeValues(rows.map(row => row[transportIdx]).filter(value => value != null && String(value).trim() !== '').join(','), ', ');
 }
 
+function getSummaryCMDBValue(sidKey, field, fallback) {
+  const value = String(cmdbGet(sidKey, field) ?? '').trim();
+  return value || String(fallback ?? '').trim();
+}
+
 function getSummarySuperSiteProgram(sidKey) {
   const program = String(cmdbGet(sidKey, 'Program') ?? '').trim();
   if (!program || norm(program) === norm('Istimewa') || ['NO', 'N/A', '-'].includes(program.toUpperCase())) return '';
@@ -1474,18 +1479,19 @@ function buildSummaryFromGDOCPG(params) {
     const sid = String(r[GDOC_IDX.SITE_ID] || '').trim();
     if (!sid) continue;
     const nid = siteKeyFn(sid);
+    const cmdbVIP = cmdbGet(nid, 'Is VIP');
     downSites.push({
       sid, nid,
-      name: String(r[GDOC_IDX.SITE_NAME] || cmdbGet(nid, 'Site Name*') || '').trim() || sid,
-      mcArea: String(cmdbGet(nid, 'MC Cluster') || r[GDOC_IDX.MC_AREA] || '').trim(),
-      hubType: String(r[GDOC_IDX.HUB_TYPE] || '').trim(),
+      name: getSummaryCMDBValue(nid, 'Site Name*', r[GDOC_IDX.SITE_NAME]) || sid,
+      mcArea: getSummaryCMDBValue(nid, 'MC Cluster', r[GDOC_IDX.MC_AREA]),
+      hubType: getSummaryCMDBValue(nid, 'HUB Type', r[GDOC_IDX.HUB_TYPE]),
       transport: getSummaryTransportOutage(nid, segLookup, segHeader),
       gdocGenset: String(r[GDOC_IDX.GENSET] || '').trim(),
       superSiteProgram: getSummarySuperSiteProgram(nid),
-      traffic: String(r[GDOC_IDX.TRAFFIC] || '').trim(),
-      p0: String(r[GDOC_IDX.P0] || '').trim(),
-      vvip: String(r[GDOC_IDX.VVIP] || '').trim(),
-      vip: String(r[GDOC_IDX.VIP] || '').trim(),
+      traffic: getSummaryCMDBValue(nid, 'Traffic Class', r[GDOC_IDX.TRAFFIC]),
+      p0: getSummaryCMDBValue(nid, 'P0 Sites', r[GDOC_IDX.P0]),
+      vvip: String(r[GDOC_IDX.VVIP] || cmdbVIP || '').trim(),
+      vip: getSummaryCMDBValue(nid, 'Is VIP', r[GDOC_IDX.VIP]),
     });
   }
   
