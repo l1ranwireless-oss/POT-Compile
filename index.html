@@ -454,7 +454,7 @@ const GDOC_HEADER_COLORS = [...Array(9).fill('00E676'),...Array(5).fill('5BC0DE'
 const GDOC_IDX = {MC_AREA:0,MC_25:1,SITE_ID:2,SITE_NAME:3,STATUS:4,HUB_TYPE:5,TRANSPORT:6,GENSET:7,SITE_CLASS:8,SUPER_SITES:9,TRAFFIC:10,P0:11,VVIP:12,VIP:13,GENSET_DEPLOY:14,ADDITIONAL_MC:15,FME:16,RTS:17,CA:18,UPDATE_TEAM:19};
 const PG_IDX = {TIME:0,REGION:1,MC_NAME:2,TOTAL_MC:3,BIG_DOWN:4,MEDIUM_DOWN:5,SMALL_DOWN:6,CRITICAL_DOWN:7,END_DOWN:8,TOTAL_DOWN:9,PCT_DOWN:10};
 
-const CMDB_NEEDED_COLS = ['Site Id','Site Name*','HUB Type','Site Priority Label','Has Generator','DG Status','Traffic Class','P0 Sites','Is VIP','FM Office*','Rts Name','Rts Id','MC Cluster','Is Hub'];
+const CMDB_NEEDED_COLS = ['Site Id','Site Name*','HUB Type','Site Priority Label','Has Generator','DG Status','Traffic Class','P0 Sites','Is VIP','FM Office*','Rts Name','Rts Id','MC Cluster','Is Hub','Previous Status Outage','Genset Deploy Status','Additional MC>25% Portable Genset run','CA','Update Team','Transport Outage'];
 const CMDB_NEEDED_IDX = {}; CMDB_NEEDED_COLS.forEach((a,i)=>{CMDB_NEEDED_IDX[a]=i;});
 const CMDB_CRITICAL_COLS = ['Site Id', 'MC Cluster', 'HUB Type', 'Site Priority Label'];
 
@@ -484,7 +484,13 @@ const COL_ALIASES = {
   'Rts Id': ['Rts Id','RtsId','RTS ID','RTS_ID','RTS'],
   'Is Hub': ['Is Hub','Super Sites','SuperSites','IsHub','Is_Hub','Super Site'],
   'Super Sites': ['Super Sites','SuperSites','Is Hub','IsHub','Super Site'],
-  'Genset': ['Genset','Genset Status','Generator Status','GensetStatus']
+  'Genset': ['Genset','Genset Status','Generator Status','GensetStatus'],
+  'Previous Status Outage': ['Previous Status Outage (BTS Local Down or Fully Site Outage)','Previous Status Outage','BTS Local Down or Fully Site Outage'],
+  'Genset Deploy Status': ['Genset Deploy Status (Permanent DG run, BAU Portable Genset run)','Genset Deploy Status','Permanent DG run','BAU Portable Genset run'],
+  'Additional MC>25% Portable Genset run': ['Additional MC>25% Portable Genset run (Yes,No)','Additional MC>25% Portable Genset run','Additional Portable Genset run'],
+  'CA': ['CA','CA Status'],
+  'Update Team': ['Update Team','Team Update'],
+  'Transport Outage': ['Transport Outage','Transport Status']
 };
 
 const SNAPSHOT_COLORS = [{fill:'DBEAFE',font:'1E40AF'},{fill:'D1FAE5',font:'065F46'},{fill:'FEF3C7',font:'92400E'},{fill:'FFEDD5',font:'9A3412'},{fill:'FEE2E2',font:'991B1B'},{fill:'F3E8FF',font:'6B21A8'},{fill:'FFE4E6',font:'9F1239'},{fill:'CCFBF1',font:'134E4A'}];
@@ -1929,7 +1935,7 @@ async function process() {
     }
 
     const keyColIdx = outHeader.indexOf('Key');
-    const siteColIdx = outHeader.indexOf('Site Id');
+    const siteColIdx = outHeader.findIndex(header => norm(header) === norm('Site Id'));
     const statusColIdx = outHeader.indexOf('Status');
     const dataPart = segRowsOut.slice(1);
     dataPart.sort((a,b) => {
@@ -2004,11 +2010,25 @@ async function process() {
       pgRowsOut.push([snapshotTime,'KSMP',mcName,cmdbStats.totalSiteMC,bT,mT,sT,cC,eT,td,pd,cmdbStats.bigMedYes,cmdbStats.critYes,cmdbStats.bigMedNo,cmdbStats.critNo,'','','','','','',bT,mT,sC,sNC,eC,eNC,mC,bC,td,yn]);
     }
 
-    // GDOC uses every POT Site Down List row, independent of the segmentation display filter.
+    // GDOC follows the same unfiltered POT-derived rows used to build the segmentation sheet.
+    const remarkColIdx = outHeader.findIndex(header => norm(header) === norm('Remark'));
+    const segmentationStatusColIdx = outHeader.findIndex(header => norm(header) === norm('Status'));
+    function gdocStatus(segRow, sidKey) {
+      const remark = remarkColIdx >= 0 ? String(segRow[remarkColIdx] ?? '').trim().toUpperCase() : '';
+      const remarkStatuses = new Set(remark.match(/\b(?:UP|DOWN)\b/g) || []);
+      if (remarkStatuses.size === 1) return remarkStatuses.values().next().value;
+      if (segmentationStatusColIdx >= 0) {
+        const status = String(segRow[segmentationStatusColIdx] ?? '').trim().toUpperCase();
+        if (status === 'UP' || status === 'DOWN') return status;
+      }
+      return segSiteIdSet.has(sidKey) ? 'DOWN' : 'UP';
+    }
     const gdocSites = new Map();
     for (let i = 0; i < sdlData.length; i++) {
       const potRow = sdlData[i];
-      const sidKey = siteKeyFn(potRow[sdlSiteIdx]);
+      const segRow = segRowsForGDOC[i];
+      if (!segRow) continue;
+      const sidKey = siteKeyFn(segRow[siteColIdx]);
       if (!sidKey) continue;
       const key = String(potRow[sdlKeyIdx] ?? '');
       const match = key.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/);
@@ -2017,8 +2037,8 @@ async function process() {
       if (!previous || snapshotTime.localeCompare(previous.snapshotTime) >= 0) {
         gdocSites.set(sidKey, {
           potRow,
-          segRow: segRowsForGDOC[i],
-          status: segSiteIdSet.has(sidKey) ? 'DOWN' : 'UP',
+          segRow,
+          status: gdocStatus(segRow, sidKey),
           snapshotTime
         });
       }
@@ -2042,7 +2062,7 @@ async function process() {
     for (const [sidKey, site] of gdocSites) {
       const potRow = site.potRow;
       const segRow = site.segRow;
-      const rSid = String(potRow[sdlSiteIdx] ?? '').trim();
+      const rSid = String(segRow[siteColIdx] ?? '').trim();
       const statusVal = site.status;
       const get = column => {
         const idx = outHeader.indexOf(column);
@@ -2066,7 +2086,12 @@ async function process() {
       const fo = cmdbGet(sidKey,'FM Office*');
       const rs = cmdbGet(sidKey,'Rts Name')||cmdbGet(sidKey,'Rts Id');
       const transport = get('Transport Outage')||sdlGet(origSdl,'Transport Outage')||segValue('Transport Outage');
-      gdocRowsOut.push([mcArea,mc25,rSid,sn,statusVal,ht,transport,permGen(sidKey),sc,ss,t2,p0,vv,vi,'','',fo,rs,'','']);
+      const previousOutage = get('Previous Status Outage')||sdlGet(origSdl,'Previous Status Outage')||cmdbGet(sidKey,'Previous Status Outage');
+      const gensetDeploy = get('Genset Deploy Status')||sdlGet(origSdl,'Genset Deploy Status')||cmdbGet(sidKey,'Genset Deploy Status');
+      const additionalMCGenset = get('Additional MC>25% Portable Genset run')||sdlGet(origSdl,'Additional MC>25% Portable Genset run')||cmdbGet(sidKey,'Additional MC>25% Portable Genset run');
+      const ca = get('CA')||sdlGet(origSdl,'CA')||cmdbGet(sidKey,'CA');
+      const updateTeam = get('Update Team')||sdlGet(origSdl,'Update Team')||cmdbGet(sidKey,'Update Team');
+      gdocRowsOut.push([mcArea,mc25,rSid,sn,statusVal,ht,previousOutage,permGen(sidKey),sc,ss,t2,p0,vv,vi,gensetDeploy,additionalMCGenset,fo,rs,ca,updateTeam]);
     }
 
     /* ═══ SUMMARY — pass summaryRows ═══ */
