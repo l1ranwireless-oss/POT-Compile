@@ -1,10 +1,12 @@
 FROM python:3.12-alpine
 
 WORKDIR /app
-COPY cmdb_server.py /app/cmdb_server.py
-RUN adduser -D -u 10001 app \
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt \
+    && adduser -D -u 10001 app \
     && mkdir -p /data/cmdb \
     && chown -R app:app /data/cmdb
+COPY cmdb_server.py excel_compiler.py /app/
 USER app
 
 ENV CMDB_DATA_DIR=/data/cmdb

@@ -10,7 +10,13 @@ sh deploy.sh
 
 Script membangun image Nginx langsung dari `index.html` terbaru dan menjalankan layanan. Buka `http://localhost:8080`. Port dapat diubah, misalnya `PORT=9000 sh deploy.sh`.
 
-Saat halaman dibuka, menu awal menyediakan tautan **Yuk Bikin POT** dan pilihan **Compiler Data POT**. Tema default menggunakan palet warna sejuk; preferensi mode terang/gelap dapat diubah melalui tombol tema.
+Saat halaman dibuka, menu awal menyediakan tautan **Yuk Bikin POT**, **POT Automated**, dan **Excel Compiler**. Tema default menggunakan palet warna sejuk; preferensi mode terang/gelap dapat diubah melalui tombol tema.
+
+## Excel Compiler
+
+Pilih **Excel Compiler** pada menu awal untuk menggabungkan 2 sampai 20 file `.xlsx`, `.xls`, atau `.csv` menjadi satu sheet. Sertakan setidaknya satu `.xlsx` sebagai template agar workbook hasil mempertahankan sheet dan formatnya; baris dari file lain dipetakan berdasarkan header (tidak peka kapitalisasi dan spasi) dan urutan kolom template. Header yang berbeda, duplikat, atau kosong ditolak agar nilai tidak bergeser. Batas total upload adalah 100 MB.
+
+Fitur ini menggunakan Python API pada deployment Docker. Masukkan `CMDB_API_TOKEN` yang sama seperti fitur CMDB. GitHub Pages bersifat statis dan tidak menjalankan API Python, sehingga Excel Compiler memerlukan deployment Docker.
 
 ## Database CMDB
 

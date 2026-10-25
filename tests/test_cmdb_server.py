@@ -1,3 +1,4 @@
+import io
 import json
 import tempfile
 import threading
@@ -6,7 +7,20 @@ from http.server import ThreadingHTTPServer
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+from openpyxl import Workbook, load_workbook
+
 from cmdb_server import make_handler
+
+
+def workbook_bytes(rows):
+    workbook = Workbook()
+    worksheet = workbook.active
+    for row in rows:
+        worksheet.append(row)
+    output = io.BytesIO()
+    workbook.save(output)
+    workbook.close()
+    return output.getvalue()
 
 
 class CMDBServerTests(unittest.TestCase):
@@ -45,6 +59,52 @@ class CMDBServerTests(unittest.TestCase):
             self.request("/api/cmdb", authorized=False)
         self.assertEqual(raised.exception.code, 401)
         raised.exception.close()
+
+    def test_excel_compile_requires_authentication(self):
+        request = Request(
+            self.base_url + "/api/excel/compile",
+            data=b"not multipart",
+            headers={"Content-Type": "application/octet-stream"},
+            method="POST",
+        )
+        with self.assertRaises(HTTPError) as raised:
+            urlopen(request)
+        self.assertEqual(raised.exception.code, 401)
+        raised.exception.close()
+
+    def test_excel_compile_returns_downloadable_workbook(self):
+        boundary = "excel-compiler-test-boundary"
+        files = [
+            ("template.xlsx", workbook_bytes([["Name", "Amount"], ["Alpha", 1]])),
+            ("extra.csv", b"amount,name\n2,Beta\n"),
+        ]
+        body = b"".join(
+            b"--" + boundary.encode() + b"\r\n"
+            + f'Content-Disposition: form-data; name="files"; filename="{name}"\r\n'.encode()
+            + b"Content-Type: application/octet-stream\r\n\r\n"
+            + content + b"\r\n"
+            for name, content in files
+        ) + b"--" + boundary.encode() + b"--\r\n"
+        request = Request(
+            self.base_url + "/api/excel/compile",
+            data=body,
+            headers={
+                "Authorization": f"Bearer {self.token}",
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+            },
+            method="POST",
+        )
+
+        response = urlopen(request)
+        self.assertEqual(response.headers.get_content_type(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        workbook = load_workbook(io.BytesIO(response.read()), read_only=True)
+        self.assertEqual(workbook.sheetnames, ["Sheet"])
+        self.assertEqual(list(workbook.active.values), [
+            ("Name", "Amount"),
+            ("Alpha", 1),
+            ("Beta", "2"),
+        ])
+        workbook.close()
 
     def test_rejects_malformed_metadata(self):
         with open(f"{self.directory.name}/metadata.json", "w", encoding="utf-8") as metadata:

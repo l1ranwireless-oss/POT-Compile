@@ -7,11 +7,16 @@ import tempfile
 import threading
 import uuid
 from datetime import datetime, timezone
+from email.parser import BytesParser
+from email.policy import default
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote
 
+from excel_compiler import compile_workbooks
+
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
+MAX_EXCEL_REQUEST_BYTES = MAX_UPLOAD_BYTES + 2 * 1024 * 1024
 ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".csv"}
 GENERATION_PATTERN = re.compile(r"^[a-f0-9]{32}\.bin$")
 
@@ -123,7 +128,62 @@ def make_handler(data_dir, token):
                 self.send_json(500, {"error": "Gagal membaca file CMDB server"})
 
         def do_POST(self):
+            if self.path == "/api/excel/compile":
+                self.compile_excel()
+                return
             self.store_source("save")
+
+        def compile_excel(self):
+            if not self.authorize():
+                return
+            try:
+                content_length = int(self.headers.get("Content-Length", "0"))
+            except (ValueError, TypeError):
+                self.send_json(400, {"error": "Ukuran upload tidak valid"})
+                return
+            if content_length <= 0:
+                self.send_json(400, {"error": "Pilih file Excel atau CSV untuk digabung"})
+                return
+            if content_length > MAX_EXCEL_REQUEST_BYTES:
+                self.send_json(413, {"error": "Total upload melebihi batas 100 MB"})
+                return
+
+            try:
+                body = self.rfile.read(content_length)
+                if len(body) != content_length:
+                    raise ValueError("Upload terputus sebelum selesai")
+                message = BytesParser(policy=default).parsebytes(
+                    f"Content-Type: {self.headers.get('Content-Type', '')}\r\n"
+                    "MIME-Version: 1.0\r\n\r\n".encode("ascii") + body
+                )
+                if not message.is_multipart():
+                    raise ValueError("Format upload multipart tidak valid")
+                files = []
+                for part in message.iter_parts():
+                    if (
+                        part.get_content_disposition() != "form-data"
+                        or part.get_param("name", header="content-disposition") != "files"
+                    ):
+                        continue
+                    filename = part.get_filename()
+                    if filename:
+                        files.append((filename, part.get_payload(decode=True) or b""))
+                output = compile_workbooks(files)
+                self.send_response(200)
+                self.send_header(
+                    "Content-Type",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+                self.send_header("Content-Length", str(len(output)))
+                self.send_header("Content-Disposition", 'attachment; filename="compiled.xlsx"')
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(output)
+            except ValueError as error:
+                self.send_json(400, {"error": str(error)})
+            except (OSError, RuntimeError) as error:
+                self.log_error("Excel compile failed: %s", error)
+                self.send_json(500, {"error": "Gagal memproses file Excel"})
 
         def do_PUT(self):
             self.store_source("update")
