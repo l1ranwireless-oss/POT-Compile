@@ -53,8 +53,11 @@
   .upload-footer{display:flex;justify-content:space-between;gap:10px;margin-top:12px;color:var(--faint);font:11px monospace}
   .actions{display:grid;gap:12px;padding:22px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:var(--shadow);animation:rise-in .5s .16s ease-out both}
   .actions label{color:var(--muted);font-size:12px;font-weight:650}
+  .token-control{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
   .token-input{width:100%;height:42px;padding:0 12px;border:1px solid var(--border);border-radius:7px;background:var(--surface-muted);color:var(--text);font:13px monospace}
   .token-input:focus{outline:2px solid rgba(82,125,129,.35);border-color:var(--accent)}
+  .token-visibility{padding:0 12px;border:1px solid var(--border);border-radius:7px;background:var(--surface-muted);color:var(--muted);font:600 11px "Segoe UI",sans-serif;cursor:pointer}
+  .token-visibility:hover{border-color:var(--accent);color:var(--text)}
   .action-button{display:flex;align-items:center;justify-content:center;gap:10px;min-height:46px;padding:10px 15px;border:1px solid transparent;border-radius:8px;background:linear-gradient(120deg,#52777b,#668589);color:#fff;font:700 13px "Segoe UI",sans-serif;cursor:pointer;transition:transform .2s,box-shadow .2s,opacity .2s}
   .action-button:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 7px 16px rgba(67,102,111,.2)}
   .action-button:disabled{opacity:.42;cursor:not-allowed}
@@ -107,7 +110,10 @@
     </div>
     <aside class="actions" aria-label="Proses dan hasil">
       <label for="api-token">Token akses API</label>
-      <input class="token-input" id="api-token" type="password" autocomplete="off" placeholder="Masukkan token server" required>
+      <div class="token-control">
+        <input class="token-input" id="api-token" type="password" autocomplete="off" placeholder="Masukkan token server" required>
+        <button class="token-visibility" id="token-visibility" type="button" aria-label="Tampilkan token API" aria-pressed="false">Tampilkan</button>
+      </div>
       <button class="action-button" id="compile-button" type="button" disabled><span aria-hidden="true">⟳</span> Gabungkan file</button>
       <div class="loading" id="loading" role="status" aria-live="polite">
         <span class="spinner" aria-hidden="true"></span>
@@ -135,6 +141,7 @@
   const compileButton = document.getElementById('compile-button');
   const downloadButton = document.getElementById('download-button');
   const tokenInput = document.getElementById('api-token');
+  const tokenVisibilityButton = document.getElementById('token-visibility');
   const statusBox = document.getElementById('status');
   const loading = document.getElementById('loading');
 
@@ -239,6 +246,13 @@
     fileInput.value = '';
   });
   tokenInput.addEventListener('input', updateControls);
+  tokenVisibilityButton.addEventListener('click', () => {
+    const visible = tokenInput.type === 'password';
+    tokenInput.type = visible ? 'text' : 'password';
+    tokenVisibilityButton.textContent = visible ? 'Sembunyikan' : 'Tampilkan';
+    tokenVisibilityButton.setAttribute('aria-label', `${visible ? 'Sembunyikan' : 'Tampilkan'} token API`);
+    tokenVisibilityButton.setAttribute('aria-pressed', String(visible));
+  });
   uploadTrigger.addEventListener('dragover', event => {
     event.preventDefault();
     uploadTrigger.style.borderColor = 'var(--accent)';
