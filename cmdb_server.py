@@ -60,7 +60,21 @@ def make_handler(data_dir, token):
                 metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 raise RuntimeError("Metadata CMDB server tidak dapat dibaca")
-            if not GENERATION_PATTERN.fullmatch(metadata.get("file", "")):
+            if not isinstance(metadata, dict):
+                raise RuntimeError("Metadata CMDB server tidak valid")
+            generation = metadata.get("file")
+            name = metadata.get("name")
+            size = metadata.get("size")
+            updated_at = metadata.get("updated_at")
+            if (
+                not isinstance(generation, str)
+                or not GENERATION_PATTERN.fullmatch(generation)
+                or not isinstance(name, str)
+                or not isinstance(size, int)
+                or isinstance(size, bool)
+                or size <= 0
+                or not isinstance(updated_at, str)
+            ):
                 raise RuntimeError("Metadata CMDB server tidak valid")
             if not (root / metadata["file"]).is_file():
                 raise RuntimeError("File CMDB server tidak ditemukan")

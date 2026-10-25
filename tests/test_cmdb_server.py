@@ -46,6 +46,16 @@ class CMDBServerTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, 401)
         raised.exception.close()
 
+    def test_rejects_malformed_metadata(self):
+        with open(f"{self.directory.name}/metadata.json", "w", encoding="utf-8") as metadata:
+            json.dump([], metadata)
+
+        with self.assertRaises(HTTPError) as raised:
+            self.request("/api/cmdb")
+        self.assertEqual(raised.exception.code, 500)
+        self.assertEqual(json.loads(raised.exception.read())["error"], "Metadata CMDB server tidak valid")
+        raised.exception.close()
+
     def test_save_update_and_load_source(self):
         content = b"CMDB source bytes"
         response = self.request(

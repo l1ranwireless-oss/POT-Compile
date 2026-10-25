@@ -595,7 +595,7 @@ const COL_ALIASES = {
   'Rts Id': ['Rts Id','RtsId','RTS ID','RTS_ID','RTS'],
   'Is Hub': ['Is Hub','IsHub','Is_Hub','Super Site'],
   'Program': ['Program','Super Sites'],
-  'Super Sites': ['Program,'Super Sites'],
+  'Super Sites': ['Program','Super Sites'],
   'Genset': ['Genset','Genset Status','Generator Status','GensetStatus'],
   'Previous Status Outage': ['Previous Status Outage (BTS Local Down or Fully Site Outage)','Previous Status Outage','BTS Local Down or Fully Site Outage'],
   'Genset Deploy Status': ['Genset Deploy Status (Permanent DG run, BAU Portable Genset run)','Genset Deploy Status','Permanent DG run','BAU Portable Genset run'],
@@ -2318,7 +2318,7 @@ async function process() {
       const mcArea = get('MC')||sdlGet(origSdl,'MC')||segValue('MC')||cmdbGet(sidKey,'MC Cluster');
       let scRaw = get('Site Class(Priority)')||sdlGet(origSdl,'Site Class(Priority)')||sdlGet(origSdl,'Site Class')||segValue('Site Class(Priority)')||cmdbGet(sidKey,'Site Priority Label');
       const sc = dedupeValues(scRaw,'/');
-      const ss = get('Super Sites')||sdlGet(origSdl,'Super Sites')||sdlGet(origSdl,'Is Hub')||segValue('Super Sites')||cmdbGet(sidKey,'Program')||cmdbGet(sidKey,'Program')||'No';
+      const ss = get('Super Sites')||sdlGet(origSdl,'Super Sites')||segValue('Super Sites')||cmdbGet(sidKey,'Program')||cmdbGet(sidKey,'Is Hub')||sdlGet(origSdl,'Is Hub')||'No';
       const t2 = get('>2TB')||sdlGet(origSdl,'>2TB')||sdlGet(origSdl,'Traffic Class')||segValue('>2TB')||cmdbGet(sidKey,'Traffic Class')||'No';
       const p0 = get('P0')||sdlGet(origSdl,'P0')||sdlGet(origSdl,'P0 Sites')||segValue('P0')||cmdbGet(sidKey,'P0 Sites')||'No';
       const vv = get('VVIP')||sdlGet(origSdl,'VVIP')||segValue('VVIP');
