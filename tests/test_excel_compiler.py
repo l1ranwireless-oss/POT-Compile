@@ -1,5 +1,9 @@
+import base64
 import io
+import os
+import tempfile
 import unittest
+from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill
@@ -76,6 +80,32 @@ class ExcelCompilerTests(unittest.TestCase):
         self.assertEqual(cell.value, "=1+1")
         self.assertEqual(cell.data_type, "s")
         workbook.close()
+
+    def test_streams_file_paths_to_output_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            template_path = Path(directory) / "template.xlsx"
+            csv_path = Path(directory) / "input.csv"
+            output_path = Path(directory) / "compiled.xlsx"
+            large_values = [
+                base64.b64encode(os.urandom(1024)).decode("ascii")
+                for _ in range(1_500)
+            ]
+            template_path.write_bytes(make_xlsx([["Name"], *[[value] for value in large_values]]))
+            self.assertGreater(template_path.stat().st_size, 1024 * 1024)
+            csv_path.write_text("Name\nAdded\n", encoding="utf-8")
+
+            result = compile_workbooks([
+                ("template.xlsx", template_path),
+                ("input.csv", csv_path),
+            ], output_path=output_path)
+
+            self.assertEqual(result, output_path)
+            workbook = load_workbook(output_path, read_only=True)
+            rows = iter(workbook.active.iter_rows(values_only=True))
+            self.assertEqual(next(rows), ("Name",))
+            self.assertEqual([next(rows)[0] for _ in large_values], large_values)
+            self.assertEqual(next(rows), ("Added",))
+            workbook.close()
 
 
 if __name__ == "__main__":

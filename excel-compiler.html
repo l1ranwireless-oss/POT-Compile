@@ -97,7 +97,7 @@
         <span>
           <span class="upload-icon" aria-hidden="true">＋</span>
           <span class="upload-title">Pilih file Excel atau CSV</span>
-          <span class="upload-detail">XLSX, XLS, CSV · maksimal 20 file / 100 MB</span>
+          <span class="upload-detail">XLSX, XLS, CSV · maksimal 20 file / 500 MB</span>
         </span>
       </button>
       <input class="file-input" id="file-input" type="file" accept=".xlsx,.xls,.csv" multiple>
@@ -123,7 +123,7 @@
 </main>
 <script>
   const MAX_FILES = 20;
-  const MAX_BYTES = 100 * 1024 * 1024;
+  const MAX_BYTES = 500 * 1024 * 1024;
   const selectedFiles = [];
   let outputBlob = null;
   let outputUrl = null;
@@ -215,7 +215,7 @@
     const totalBytes = selectedFiles.reduce((total, file) => total + file.size, 0);
     if (totalBytes > MAX_BYTES) {
       selectedFiles.splice(initialCount);
-      setStatus('Total ukuran file maksimal 100 MB.', 'error');
+      setStatus('Total ukuran file maksimal 500 MB.', 'error');
     } else if (invalidCount) {
       setStatus('Sebagian file dilewati. Gunakan XLSX, XLS, atau CSV.', 'error');
     } else if (selectedFiles.length >= MAX_FILES && added < supported.length) {

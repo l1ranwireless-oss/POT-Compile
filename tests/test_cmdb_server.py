@@ -106,6 +106,34 @@ class CMDBServerTests(unittest.TestCase):
         ])
         workbook.close()
 
+    def test_excel_compile_spools_uploads_larger_than_one_mib(self):
+        boundary = "excel-compiler-large-test-boundary"
+        template = workbook_bytes([["Name"], ["Template"]])
+        csv_content = b"Name\n" + (b"Added-" + b"x" * 1024 + b"\n") * 1_100
+        self.assertGreater(len(csv_content), 1024 * 1024)
+        files = [("template.xlsx", template), ("large.csv", csv_content)]
+        body = b"".join(
+            b"--" + boundary.encode() + b"\r\n"
+            + f'Content-Disposition: form-data; name="files"; filename="{name}"\r\n'.encode()
+            + b"Content-Type: application/octet-stream\r\n\r\n"
+            + content + b"\r\n"
+            for name, content in files
+        ) + b"--" + boundary.encode() + b"--\r\n"
+        request = Request(
+            self.base_url + "/api/excel/compile",
+            data=body,
+            headers={
+                "Authorization": f"Bearer {self.token}",
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+            },
+            method="POST",
+        )
+
+        response = urlopen(request)
+        workbook = load_workbook(io.BytesIO(response.read()), read_only=True)
+        self.assertEqual(sum(1 for _ in workbook.active.iter_rows()), 1_102)
+        workbook.close()
+
     def test_rejects_malformed_metadata(self):
         with open(f"{self.directory.name}/metadata.json", "w", encoding="utf-8") as metadata:
             json.dump([], metadata)

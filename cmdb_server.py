@@ -7,16 +7,18 @@ import tempfile
 import threading
 import uuid
 from datetime import datetime, timezone
-from email.parser import BytesParser
-from email.policy import default
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote
 
-from excel_compiler import compile_workbooks
+from python_multipart.exceptions import MultipartParseError
+from python_multipart.multipart import File as MultipartFile
+from python_multipart.multipart import MultipartParser, parse_options_header
+
+from excel_compiler import MAX_FILES, MAX_UPLOAD_BYTES as MAX_EXCEL_UPLOAD_BYTES, compile_workbooks
 
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
-MAX_EXCEL_REQUEST_BYTES = MAX_UPLOAD_BYTES + 2 * 1024 * 1024
+MAX_EXCEL_REQUEST_BYTES = MAX_EXCEL_UPLOAD_BYTES + 2 * 1024 * 1024
 ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".csv"}
 GENERATION_PATTERN = re.compile(r"^[a-f0-9]{32}\.bin$")
 
@@ -145,45 +147,131 @@ def make_handler(data_dir, token):
                 self.send_json(400, {"error": "Pilih file Excel atau CSV untuk digabung"})
                 return
             if content_length > MAX_EXCEL_REQUEST_BYTES:
-                self.send_json(413, {"error": "Total upload melebihi batas 100 MB"})
+                self.send_json(413, {"error": "Total upload melebihi batas 500 MB"})
                 return
 
+            uploads = []
+            files = []
+            output_path = None
             try:
-                body = self.rfile.read(content_length)
-                if len(body) != content_length:
-                    raise ValueError("Upload terputus sebelum selesai")
-                message = BytesParser(policy=default).parsebytes(
-                    f"Content-Type: {self.headers.get('Content-Type', '')}\r\n"
-                    "MIME-Version: 1.0\r\n\r\n".encode("ascii") + body
-                )
-                if not message.is_multipart():
+                content_type, options = parse_options_header(self.headers.get("Content-Type"))
+                boundary = options.get(b"boundary")
+                if content_type != b"multipart/form-data" or not boundary:
                     raise ValueError("Format upload multipart tidak valid")
-                files = []
-                for part in message.iter_parts():
-                    if (
-                        part.get_content_disposition() != "form-data"
-                        or part.get_param("name", header="content-disposition") != "files"
-                    ):
-                        continue
-                    filename = part.get_filename()
-                    if filename:
-                        files.append((filename, part.get_payload(decode=True) or b""))
-                output = compile_workbooks(files)
+
+                state = {
+                    "headers": {},
+                    "header_name": bytearray(),
+                    "header_value": bytearray(),
+                    "upload": None,
+                    "filename": None,
+                }
+
+                def on_part_begin():
+                    state["headers"] = {}
+                    state["header_name"].clear()
+                    state["header_value"].clear()
+                    state["upload"] = None
+                    state["filename"] = None
+
+                def on_header_field(data, start, end):
+                    state["header_name"].extend(data[start:end])
+
+                def on_header_value(data, start, end):
+                    state["header_value"].extend(data[start:end])
+
+                def on_header_end():
+                    name = bytes(state["header_name"]).lower()
+                    state["headers"][name] = bytes(state["header_value"])
+                    state["header_name"].clear()
+                    state["header_value"].clear()
+
+                def on_headers_finished():
+                    disposition, parameters = parse_options_header(
+                        state["headers"].get(b"content-disposition")
+                    )
+                    if disposition != b"form-data" or parameters.get(b"name") != b"files":
+                        return
+                    filename = parameters.get(b"filename")
+                    if not filename:
+                        return
+                    if len(uploads) >= MAX_FILES:
+                        raise ValueError("Maksimal 20 file per proses")
+                    decoded_name = filename.decode("utf-8", errors="replace")
+                    upload = MultipartFile(
+                        filename,
+                        b"files",
+                        config={"MAX_MEMORY_FILE_SIZE": 0, "UPLOAD_KEEP_EXTENSIONS": True},
+                    )
+                    uploads.append(upload)
+                    state["upload"] = upload
+                    state["filename"] = decoded_name
+
+                def on_part_data(data, start, end):
+                    upload = state["upload"]
+                    if upload is not None:
+                        upload.write(data[start:end])
+
+                def on_part_end():
+                    upload = state["upload"]
+                    if upload is None:
+                        return
+                    upload.finalize()
+                    source = upload.file_object.getvalue() if upload.in_memory else Path(upload.file_object.name)
+                    files.append((state["filename"], source))
+                    state["upload"] = None
+
+                parser = MultipartParser(
+                    boundary,
+                    callbacks={
+                        "on_part_begin": on_part_begin,
+                        "on_header_field": on_header_field,
+                        "on_header_value": on_header_value,
+                        "on_header_end": on_header_end,
+                        "on_headers_finished": on_headers_finished,
+                        "on_part_data": on_part_data,
+                        "on_part_end": on_part_end,
+                    },
+                    max_size=MAX_EXCEL_REQUEST_BYTES,
+                )
+                remaining = content_length
+                while remaining:
+                    chunk = self.rfile.read(min(64 * 1024, remaining))
+                    if not chunk:
+                        raise ValueError("Upload terputus sebelum selesai")
+                    if parser.write(chunk) != len(chunk):
+                        raise ValueError("Total upload melebihi batas 500 MB")
+                    remaining -= len(chunk)
+                parser.finalize()
+
+                with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as output:
+                    output_path = Path(output.name)
+                compile_workbooks(files, output_path=output_path)
+                output_size = output_path.stat().st_size
                 self.send_response(200)
                 self.send_header(
                     "Content-Type",
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
-                self.send_header("Content-Length", str(len(output)))
+                self.send_header("Content-Length", str(output_size))
                 self.send_header("Content-Disposition", 'attachment; filename="compiled.xlsx"')
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
-                self.wfile.write(output)
+                with output_path.open("rb") as output:
+                    while chunk := output.read(1024 * 1024):
+                        self.wfile.write(chunk)
             except ValueError as error:
                 self.send_json(400, {"error": str(error)})
+            except MultipartParseError:
+                self.send_json(400, {"error": "Format upload multipart tidak valid"})
             except (OSError, RuntimeError) as error:
                 self.log_error("Excel compile failed: %s", error)
                 self.send_json(500, {"error": "Gagal memproses file Excel"})
+            finally:
+                for upload in uploads:
+                    upload.close()
+                if output_path is not None:
+                    output_path.unlink(missing_ok=True)
 
         def do_PUT(self):
             self.store_source("update")
