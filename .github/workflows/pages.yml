@@ -30,6 +30,7 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html _site/index.html
+          cp excel-compiler.html _site/excel-compiler.html
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
