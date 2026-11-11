@@ -444,7 +444,7 @@
   <div class="summary-card" id="summary-card">
     <h2><span class="icon-badge">📊</span> INCIDENT SUMMARY</h2>
     <div class="summary-meta">
-      <span>Source: Summary Report + GDOC + PG + CMDB</span>
+      <span>Source: BCP Key + Segmentation + GDOC + PG + CMDB + ZIP</span>
       <span id="sum-meta-mc">MC: -</span>
       <span id="sum-meta-down">Down: -</span>
       <span id="sum-meta-up">UP: -</span>
@@ -1086,18 +1086,17 @@ function extractSummaryReportValues(summaryRows, targetMC) {
   const header = summaryRows[hdrIdx] || [];
   
   let mcCol = -1;
-  for (const alias of ['Remark','MC Cluster','MC Area','MC','Region']) {
+  for (const alias of ['MC Cluster','MC Area','MC','Region','Remark']) {
     const f = autoMatch(alias, header);
     if (f) { mcCol = header.indexOf(f); break; }
   }
-  if (mcCol < 0) mcCol = 2;
   
   let downCol = -1;
   for (const alias of ['Total Sites Down','Sites Down','Total Down','Site Down']) {
     const f = autoMatch(alias, header);
     if (f) { downCol = header.indexOf(f); break; }
   }
-  if (downCol < 0) downCol = 3;
+  if (downCol < 0) return result;
   
   let timeCol = -1;
   for (const alias of ['BCP Time','Time','Snapshot']) {
@@ -1108,6 +1107,7 @@ function extractSummaryReportValues(summaryRows, targetMC) {
   result.mcCol = mcCol; result.downCol = downCol; result.timeCol = timeCol;
   
   const dataRows = summaryRows.slice(hdrIdx + 1).filter(r => r && r.some(c => c !== '' && c != null));
+  if (mcCol < 0) return result;
   const targetNorm = normMCKey(targetMC);
   
   let matched = [];
@@ -1149,6 +1149,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const norm = s => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const normSiteId = s => String(s ?? '').trim().toUpperCase().replace(/[\s\-_.]/g, '');
 const normMCKey = s => String(s ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+function extractBCPSnapshotTime(key) {
+  const match = String(key ?? '').match(/(\d{4}-\d{2}-\d{2})[ T]+(\d{2}):(\d{2})(?::(\d{2}))?/);
+  return match ? `${match[1]} ${match[2]}:${match[3]}:${match[4] || '00'}` : String(key ?? '').trim();
+}
 function dedupeValues(val, sep='/') {
   if (val == null) return '';
   const s = String(val).trim(); if (!s) return '';
@@ -1462,13 +1466,15 @@ function getSummaryTransportOutage(sidKey, outputSegRowsBySiteId, outputSegHeade
   const outputTransportHeader = autoMatch('Transport Outage', outputSegHeader);
   if (outputTransportHeader) {
     const outputTransportIdx = outputSegHeader.indexOf(outputTransportHeader);
-    const outputTransport = dedupeValues(
-      (outputSegRowsBySiteId.get(sidKey) || [])
-        .map(row => row[outputTransportIdx])
-        .filter(value => value != null && String(value).trim() !== '')
-        .join(','),
-      ', '
-    );
+    const keyHeader = outputSegHeader.find(header => norm(header) === norm('Key'));
+    const keyIdx = keyHeader ? outputSegHeader.indexOf(keyHeader) : -1;
+    const latestRow = (outputSegRowsBySiteId.get(sidKey) || []).reduce((latest, row) => {
+      return !latest || (keyIdx >= 0
+        && extractBCPSnapshotTime(row[keyIdx]).localeCompare(extractBCPSnapshotTime(latest[keyIdx])) > 0)
+        ? row
+        : latest;
+    }, null);
+    const outputTransport = latestRow ? String(latestRow[outputTransportIdx] ?? '').trim() : '';
     if (outputTransport) return outputTransport;
   }
   return String(cmdbGet(sidKey, 'Transport Outage') ?? '').trim();
@@ -1495,18 +1501,41 @@ function buildSummaryFromGDOCPG(params) {
   const pgData = pgRowsOut.slice(2);
   const pgFirst = pgData[0] || [];
   const pgLatest = pgData[pgData.length - 1] || [];
-  const startTime = String(pgFirst[PG_IDX.TIME] || '').trim();
-  const updateTime = String(pgLatest[PG_IDX.TIME] || '').trim();
-  
+  let startTime = String(pgFirst[PG_IDX.TIME] || '').trim();
+  let updateTime = String(pgLatest[PG_IDX.TIME] || '').trim();
+  const outputKeyHeader = segmentationHeader.find(header => norm(header) === norm('Key'));
+  const outputKeyIdx = outputKeyHeader ? segmentationHeader.indexOf(outputKeyHeader) : -1;
+  const snapshotTimes = new Set();
+  const bcpKeyBySnapshotTime = new Map();
+  if (outputKeyIdx >= 0) {
+    for (const row of segmentationRows) {
+      const time = extractBCPSnapshotTime(row[outputKeyIdx]);
+      if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(time)) continue;
+      snapshotTimes.add(time);
+      const currentKey = bcpKeyBySnapshotTime.get(time);
+      const candidateKey = String(row[outputKeyIdx] ?? '').trim();
+      if (!currentKey || candidateKey.localeCompare(currentKey) < 0) bcpKeyBySnapshotTime.set(time, candidateKey);
+    }
+  }
+  const sortedSnapshotTimes = [...snapshotTimes].sort();
+  const latestBCPKey = sortedSnapshotTimes.length
+    ? bcpKeyBySnapshotTime.get(sortedSnapshotTimes[sortedSnapshotTimes.length - 1])
+    : '';
+  if (sortedSnapshotTimes.length) {
+    startTime = sortedSnapshotTimes[0];
+    updateTime = sortedSnapshotTimes[sortedSnapshotTimes.length - 1];
+  }
+
   let agingStr = '--:--';
   if (startTime && updateTime) {
-    const t1 = new Date(startTime.replace(' ', 'T') + ':00');
-    const t2 = new Date(updateTime.replace(' ', 'T') + ':00');
+    const t1 = new Date(startTime.replace(' ', 'T'));
+    const t2 = new Date(updateTime.replace(' ', 'T'));
     if (!isNaN(t1.getTime()) && !isNaN(t2.getTime())) {
-      const diffMin = Math.max(0, Math.floor((t2 - t1) / 60000));
-      const hh = String(Math.floor(diffMin / 60)).padStart(2, '0');
-      const mm = String(diffMin % 60).padStart(2, '0');
-      agingStr = hh + ':' + mm;
+      const diffSeconds = Math.max(0, Math.floor((t2 - t1) / 1000));
+      const hh = String(Math.floor(diffSeconds / 3600)).padStart(2, '0');
+      const mm = String(Math.floor((diffSeconds % 3600) / 60)).padStart(2, '0');
+      const ss = String(diffSeconds % 60).padStart(2, '0');
+      agingStr = `${hh}:${mm}:${ss}`;
     }
   }
   
@@ -1523,6 +1552,23 @@ function buildSummaryFromGDOCPG(params) {
   }
   const outputStatusHeader = segmentationHeader.find(header => norm(header) === norm('Status'));
   const outputStatusIdx = outputStatusHeader ? segmentationHeader.indexOf(outputStatusHeader) : -1;
+  const alarmColumns = [
+    ['Alarm', 'Alarm'],
+    ['Alarm Identifier', 'Alarm Identifier'],
+    ['Power Alarm Name', 'Power Alarm Name'],
+    ['Power Alarm Time', 'Power Alarm Time'],
+    ['Mains Failure (Exal & PMS) Last Occur Time', 'Mains Failure'],
+    ['Router Power Alarm', 'Router Power Alarm'],
+    ['Router Power Alarm Time', 'Router Power Alarm Time'],
+    ['DWDM Alarm', 'DWDM Alarm'],
+    ['DWDM Alarm Time', 'DWDM Alarm Time'],
+    ['DWDM Power Alarm', 'DWDM Power Alarm'],
+    ['DWDM Power Alarm Time', 'DWDM Power Alarm Time'],
+  ].map(([label, alias]) => {
+    const header = segmentationHeader.find(value => norm(value) === norm(alias));
+    return header ? {label, index: segmentationHeader.indexOf(header), isPower: /^(Power Alarm|Mains Failure|Router Power Alarm|DWDM Power Alarm)/.test(label)} : null;
+  }).filter(Boolean);
+  const segGensetHeader = segmentationHeader.find(header => norm(header) === norm('Genset'));
   const gdocData = gdocRows.slice(1);
   const allSites = [];
   const downSites = [];
@@ -1538,6 +1584,26 @@ function buildSummaryFromGDOCPG(params) {
     const status = ['UP', 'DOWN'].includes(gdocStatus)
       ? gdocStatus
       : (outputStatus || 'DOWN');
+    const latestSegmentationRow = matchedOutputRows.reduce((latest, row) => {
+      if (!latest || (outputKeyIdx >= 0
+        && extractBCPSnapshotTime(row[outputKeyIdx]).localeCompare(extractBCPSnapshotTime(latest[outputKeyIdx])) > 0)) {
+        return row;
+      }
+      return latest;
+    }, null);
+    const alarmDetails = latestSegmentationRow
+      ? alarmColumns.map(({label, index}) => ({
+          label,
+          value: String(latestSegmentationRow[index] ?? '').trim()
+        })).filter(({value}) => value && !['NO', 'N/A', '-', 'NONE'].includes(value.toUpperCase()))
+      : [];
+    const powerAlarmDetails = alarmDetails.filter(({label}) =>
+      alarmColumns.find(column => column.label === label)?.isPower
+    );
+    const zipPowerAlarm = !!powerAlarmSites?.has(nid);
+    const segGenset = latestSegmentationRow && segGensetHeader
+      ? String(latestSegmentationRow[segmentationHeader.indexOf(segGensetHeader)] ?? '').trim()
+      : '';
     const cmdbVIP = cmdbGet(nid, 'Is VIP');
     const site = {
       sid, nid,
@@ -1546,12 +1612,15 @@ function buildSummaryFromGDOCPG(params) {
       mcArea: getSummaryCMDBValue(nid, 'MC Cluster', r[GDOC_IDX.MC_AREA]),
       hubType: getSummaryCMDBValue(nid, 'HUB Type', r[GDOC_IDX.HUB_TYPE]),
       transport: getSummaryTransportOutage(nid, outputSegRowsBySiteId, segmentationHeader),
-      gdocGenset: String(r[GDOC_IDX.GENSET] || '').trim(),
+      gdocGenset: String(r[GDOC_IDX.GENSET] || segGenset).trim(),
       superSiteProgram: getSummarySuperSiteProgram(nid),
       traffic: getSummaryCMDBValue(nid, 'Traffic Class', r[GDOC_IDX.TRAFFIC]),
       p0: getSummaryCMDBValue(nid, 'P0 Sites', r[GDOC_IDX.P0]),
       vvip: String(r[GDOC_IDX.VVIP] || cmdbVIP || '').trim(),
       vip: getSummaryCMDBValue(nid, 'Is VIP', r[GDOC_IDX.VIP]),
+      powerAlarmDetails,
+      alarmDetails,
+      zipPowerAlarm,
     };
     allSites.push(site);
     if (status === 'DOWN') downSites.push(site);
@@ -1585,28 +1654,32 @@ function buildSummaryFromGDOCPG(params) {
   /* Power Alarm cross-ref */
   let powerAlarmCount = 0;
   const powerAlarmByMC = new Map();
-  if (powerAlarmSites && powerAlarmSites.size > 0) {
-    for (const site of downSites) {
-      if (!powerAlarmSites.has(site.nid)) continue;
-      powerAlarmCount++;
-      const mcKey = findBestMCMatch(site.mcArea);
-      const label = mcKey
-        ? (CMDB_CACHE.statsByMC.get(mcKey)?.displayName || site.mcArea || 'MC tidak diketahui')
-        : (site.mcArea || 'MC tidak diketahui');
-      powerAlarmByMC.set(label, (powerAlarmByMC.get(label) || 0) + 1);
-    }
+  const powerAlarmSitesDetails = [];
+  for (const site of downSites) {
+    if (!site.powerAlarmDetails.length && !site.zipPowerAlarm) continue;
+    powerAlarmCount++;
+    const mcKey = findBestMCMatch(site.mcArea);
+    const label = mcKey
+      ? (CMDB_CACHE.statsByMC.get(mcKey)?.displayName || site.mcArea || 'MC tidak diketahui')
+      : (site.mcArea || 'MC tidak diketahui');
+    powerAlarmByMC.set(label, (powerAlarmByMC.get(label) || 0) + 1);
+    powerAlarmSitesDetails.push({
+      sid: site.sid,
+      name: site.name,
+      mc: label,
+      details: site.powerAlarmDetails,
+      zipPowerAlarm: site.zipPowerAlarm,
+    });
   }
   const powerAlarmMcCount = powerAlarmCount;
   
   /* Aggregate incident counts across all impacted MC Clusters. */
   const sdr = hasMultipleImpactedMCs ? null : extractSummaryReportValues(summaryRows, mcLabel);
   let totalDown = downSites.length;
-  let totalDownSource = 'GDOC';
-  if (sdr && sdr.totalDown !== null && sdr.matched > 0) {
-    totalDown = sdr.totalDown;
-    totalDownSource = 'Summary Report';
-  } else if (sdr && sdr.totalDown === null) {
-    log(`⚠️ Summary Report tidak match MC "${mcLabel}" — fallback ke GDOC count (${totalDown})`);
+  const totalDownSource = 'GDOC';
+  const summaryReportDown = sdr?.totalDown ?? null;
+  if (summaryReportDown !== null && summaryReportDown !== totalDown) {
+    log(`⚠️ Total Down BCP Summary Report (${summaryReportDown}) berbeda dari hasil status GDOC (${totalDown}); summary menggunakan GDOC.`);
   }
   
   let totalSiteMC = 0;
@@ -1663,7 +1736,14 @@ function buildSummaryFromGDOCPG(params) {
     }
     let siteList = [];
     if (cat.showSites) {
-      siteList = sitesDown.map(s => ({ name: s.name || s.sid, transport: s.transport || '', genset: deriveGensetLabel(s.nid, s.gdocGenset) }));
+      siteList = sitesDown.map(s => ({
+        sid: s.sid,
+        name: s.name || s.sid,
+        mc: s.mcArea,
+        transport: s.transport || '',
+        genset: deriveGensetLabel(s.nid, s.gdocGenset),
+        alarms: s.alarmDetails,
+      }));
     }
     categoryResults.push({
       key: cat.key, name: cat.name, format: cat.format, showSites: cat.showSites,
@@ -1692,9 +1772,9 @@ function buildSummaryFromGDOCPG(params) {
   log(`📊 MC>25%: ${mcAbove25List.length} MC · unique: ${mcUnique.size}`);
   
   return {
-    agingStr, startTime, updateTime, totalDown, totalDownSource, totalSiteMC, pctDown,
+    agingStr, startTime, updateTime, latestBCPKey, totalDown, totalDownSource, summaryReportDown, totalSiteMC, pctDown,
     allSiteCount: allSites.length, upSites,
-    powerAlarmCount, powerAlarmMcCount, powerAlarmByMC,
+    powerAlarmCount, powerAlarmMcCount, powerAlarmByMC, powerAlarmSitesDetails,
     categoryResults, mcAbove25List, targetMC: mcLabel, impactedMCs: mcLabels
   };
 }
@@ -1707,10 +1787,14 @@ function generateSummaryText(summary) {
     lines.push('');
     lines.push(`Start Time: ${summary.startTime || '-'}`);
     lines.push(`Update Time: ${summary.updateTime || '-'}`);
+    lines.push(`Latest BCP Key: ${summary.latestBCPKey || '-'}`);
     lines.push('');
     lines.push(`Sites down / total site under MC Impacted: ${summary.totalDown}/${summary.totalSiteMC} (${summary.pctDown.toFixed(2)}%)`);
     lines.push(`Total Sites Down under impacted MC Cluster (${summary.targetMC}): ${summary.totalDown} out of ${summary.totalSiteMC} (${summary.pctDown.toFixed(2)}%)`);
     lines.push(`Site ID in GDOC: ${summary.allSiteCount} · DOWN: ${summary.allSiteCount - summary.upSites.length} · UP: ${summary.upSites.length}`);
+    if (summary.summaryReportDown !== null && summary.summaryReportDown !== summary.totalDown) {
+      lines.push(`Cross-check BCP Summary Report: ${summary.summaryReportDown} DOWN · selisih ${summary.summaryReportDown - summary.totalDown} dari hitungan status GDOC`);
+    }
     lines.push(`Sites with Power Alarm: ${summary.powerAlarmCount}`);
     const alarmMCs = summary.impactedMCs || [];
     if (alarmMCs.length) {
@@ -1718,8 +1802,15 @@ function generateSummaryText(summary) {
     } else {
       lines.push(`${summary.targetMC} : ${summary.powerAlarmMcCount}`);
     }
+    if (summary.powerAlarmSitesDetails?.length) {
+      for (const site of summary.powerAlarmSitesDetails) {
+        const detailText = site.details.map(item => `${item.label}: ${item.value}`);
+        if (site.zipPowerAlarm) detailText.push('terdeteksi pada file ZIP');
+        lines.push(`- ${site.sid}${site.name && site.name !== site.sid ? ` ${site.name}` : ''} [${site.mc || 'MC tidak diketahui'}] — ${detailText.join('; ')}`);
+      }
+    }
     lines.push('');
-    lines.push(`Sites UP (status eksplisit dari POT): ${summary.upSites.length}`);
+    lines.push(`Sites UP pada GDOC (termasuk yang tidak muncul di Key terbaru): ${summary.upSites.length}`);
     if (summary.upSites.length) {
       for (const site of summary.upSites) {
         const parts = [site.sid];
@@ -1741,8 +1832,11 @@ function generateSummaryText(summary) {
       if (cat.showSites && cat.sites && cat.sites.length > 0) {
         for (const s of cat.sites) {
           const parts = [s.name || s.sid || ''];
+          if (s.sid) parts.push(`[${s.sid}]`);
+          if (s.mc) parts.push(`(${s.mc})`);
           if (s.transport) parts.push(`(${s.transport})`);
           if (s.genset) parts.push(`(${s.genset})`);
+          if (s.alarms?.length) parts.push(`{${s.alarms.map(alarm => `${alarm.label}: ${alarm.value}`).join('; ')}}`);
           lines.push(parts.join(' '));
         }
       }
@@ -2131,16 +2225,15 @@ async function process() {
 
     const keyGroups = new Map();
     function snapshotTimeFromKey(key) {
-      const match = String(key ?? '').match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?/);
-      return match ? `${match[1]} ${match[2]}:${match[3]}:${match[4] || '00'}` : String(key ?? '');
+      return extractBCPSnapshotTime(key);
     }
-    for (let i = 1; i < segRowsOut.length; i++) {
-      const key = String(segRowsOut[i][keyColIdx]??'');
+    for (const row of segRowsForGDOC) {
+      const key = String(row[keyColIdx]??'');
       if (!key) continue;
       if (!keyGroups.has(key)) {
         keyGroups.set(key, {snapshotTime: snapshotTimeFromKey(key), rows: []});
       }
-      keyGroups.get(key).rows.push(segRowsOut[i]);
+      keyGroups.get(key).rows.push(row);
     }
     const sortedKeys = Array.from(keyGroups.keys()).sort((a,b) => keyGroups.get(a).snapshotTime.localeCompare(keyGroups.get(b).snapshotTime));
     const keyColorMap = {};
@@ -2386,8 +2479,10 @@ async function process() {
         throw new Error(`Validasi file gagal: Status segmentation tidak valid untuk Site ID ${siteId}`);
       }
       const key = validationSegKeyIdx >= 0 ? String(row[validationSegKeyIdx] ?? '') : '';
-      const match = key.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/);
-      const snapshotTime = match ? `${match[1]} ${match[2]}` : key || String(rowIndex).padStart(10, '0');
+      const parsedSnapshotTime = extractBCPSnapshotTime(key);
+      const snapshotTime = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(parsedSnapshotTime)
+        ? parsedSnapshotTime
+        : key || String(rowIndex).padStart(10, '0');
       const previous = expectedSegmentationStatus.get(siteKey);
       if (!previous || snapshotTime.localeCompare(previous.snapshotTime) >= 0) {
         expectedSegmentationStatus.set(siteKey, {siteId, status, snapshotTime});
