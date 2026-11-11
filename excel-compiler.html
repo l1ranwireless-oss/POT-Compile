@@ -155,6 +155,40 @@
   .status.success{background:color-mix(in srgb,var(--green) 7%,var(--surface))}
   .status.error{background:color-mix(in srgb,var(--red) 7%,var(--surface))}
   .back-link:hover,.theme-button:hover{box-shadow:0 8px 20px color-mix(in srgb,var(--accent) 12%,transparent)}
+  .workspace{grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr)}
+  .section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;font-size:16px}
+  .source-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .source-actions .action-button{min-height:38px;padding:8px 12px;font-size:11px}
+  .upload-trigger{min-height:104px}
+  .upload-icon{width:38px;height:38px;margin-bottom:7px;font-size:20px}
+  .upload-title{font-size:14px}
+  .upload-detail{font-size:11px}
+  .file-list{max-height:300px;overflow:auto}
+  .file-count-badge{flex:0 0 auto;padding:4px 9px;border-radius:999px;background:color-mix(in srgb,var(--accent) 10%,var(--surface));color:var(--accent);font-size:11px;font-weight:700}
+  .file-controls{display:flex;align-items:center;gap:4px}
+  .file-order,.remove-file{display:grid;place-items:center;width:30px;height:30px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-size:14px;cursor:pointer;transition:background .18s,color .18s}
+  .file-order:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 10%,var(--surface));color:var(--accent)}
+  .file-order:disabled,.remove-file:disabled{opacity:.35;cursor:not-allowed}
+  .field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  .field{display:grid;gap:5px;color:var(--muted);font-size:12px;font-weight:650}
+  .field input,.field select{width:100%;min-height:40px;padding:8px 10px;border:1px solid var(--border);border-radius:9px;background:var(--surface-muted);color:var(--text);font:500 13px "Inter","Segoe UI",sans-serif}
+  .field input:focus,.field select:focus{outline:2px solid color-mix(in srgb,var(--accent) 35%,transparent);border-color:var(--accent)}
+  .field input:disabled{opacity:.55}
+  .check-list{display:grid;gap:9px;margin:15px 0;color:var(--muted);font-size:12px}
+  .check-label{display:flex;align-items:center;gap:9px;cursor:pointer}
+  .check-label input{width:16px;height:16px;accent-color:var(--accent)}
+  .field-hint,.notice{color:var(--faint);font-size:11px;line-height:1.55}
+  .output-field{margin:14px 0}
+  .progress-wrap{height:8px;overflow:hidden;border-radius:99px;background:var(--border)}
+  .progress-fill{width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--accent),var(--green));transition:width .25s ease}
+  .progress-status{min-height:20px;margin-top:8px;color:var(--muted);font-size:12px}
+  .log-card{margin-top:16px;padding:20px;border:1px solid var(--border);border-radius:18px;background:color-mix(in srgb,var(--surface) 88%,transparent);box-shadow:var(--shadow);backdrop-filter:blur(16px)}
+  .log-box{height:190px;overflow:auto;padding:12px;border-radius:10px;background:#172522;color:#e5eee9;font:11px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+  .log-line.ok{color:#9ed1ac}.log-line.error{color:#e6aaa3}.log-line.dim{color:#9aafa5}
+  .privacy-note{margin:16px 0 0;text-align:center;color:var(--faint);font-size:11px}
+  .empty-note{padding:18px 10px;text-align:center;color:var(--faint);font-size:12px}
+  [hidden]{display:none!important}
+  @media(max-width:720px){.workspace{grid-template-columns:1fr}.actions{position:static}.log-card{padding:16px}}
   @media(prefers-reduced-motion:reduce){body::before,body::after{display:none}.hero:hover,.hero-facts span:hover{transform:none}}
 </style>
 </head>
@@ -168,71 +202,86 @@
   <header class="hero">
     <div class="eyebrow">Workbook tools</div>
     <h1>Excel Compiler</h1>
-    <p>Satukan beberapa file Excel atau CSV menjadi satu sheet. Kolom dicocokkan berdasarkan header agar data tetap sejajar.</p>
+    <p>Gabungkan beberapa workbook atau CSV ke satu sheet, dari file lokal di browser Anda. Pilih sheet, baris header, dan informasi sumber sesuai kebutuhan.</p>
     <div class="hero-facts" aria-label="Batas dan kebutuhan kompilasi">
-      <span>2–20 file</span><span>Maks. 500 MB</span><span>XLSX · XLS · CSV</span><span>Output 1 sheet</span>
+      <span>Semua sheet atau pilihan</span><span>XLSX · XLS · XLSM · CSV</span><span>Output 1 sheet</span><span>Privasi lokal</span>
     </div>
   </header>
   <section class="workspace" aria-label="Excel Compiler">
     <div class="upload-area">
+      <h2 class="section-title">📂 Sumber File <span class="file-count-badge" id="file-count">0 file</span></h2>
+      <div class="source-actions">
+        <button class="action-button secondary" id="add-files-button" type="button">＋ Tambah file</button>
+        <button class="action-button secondary" id="add-folder-button" type="button">▣ Tambah folder</button>
+        <button class="action-button secondary" id="clear-files-button" type="button">Hapus semua</button>
+      </div>
       <button class="upload-trigger" id="upload-trigger" type="button" aria-controls="source-files" aria-describedby="upload-guidance">
         <span>
           <span class="upload-icon" aria-hidden="true">＋</span>
-          <span class="upload-title">Gabungkan file Excel atau CSV</span>
-          <span class="upload-detail">Klik atau tarik dan lepas · XLSX, XLS, CSV</span>
+          <span class="upload-title">Tambah atau tarik file ke sini</span>
+          <span class="upload-detail">XLSX, XLS, XLSM, CSV</span>
         </span>
       </button>
-      <input class="file-input" id="file-input" type="file" accept=".xlsx,.xls,.csv" multiple>
+      <input class="file-input" id="file-input" type="file" accept=".xlsx,.xls,.xlsm,.csv" multiple>
+      <input class="file-input" id="folder-input" type="file" accept=".xlsx,.xls,.xlsm,.csv" webkitdirectory multiple>
       <ul class="file-list" id="source-files" aria-label="File yang dipilih"></ul>
       <div class="empty-note" id="empty-note">Belum ada file dipilih</div>
-      <div class="upload-guide" aria-label="Syarat kompilasi" aria-live="polite">
-        <div class="guide-item" id="guide-files">Pilih minimal 2 file (maksimal 20).</div>
-        <div class="guide-item" id="guide-headers">Header tiap file harus cocok.</div>
-        <div class="guide-item" id="guide-api">Menunggu Python API siap.</div>
-      </div>
-      <div class="upload-footer" id="upload-guidance"><span id="file-count">0 file</span><span id="total-size">0 B</span><span>maksimal 20 file / 500 MB</span></div>
-      <div class="capacity-meter" id="capacity-meter" role="progressbar" aria-label="Penggunaan batas ukuran upload" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="capacity-fill"></span></div>
+      <div class="upload-footer" id="upload-guidance"><span id="total-size">0 B</span><span>Urutkan file untuk mengatur urutan data</span></div>
     </div>
     <aside class="actions" aria-label="Proses dan hasil">
-      <button class="action-button" id="compile-button" type="button" disabled><span aria-hidden="true">⟳</span> Gabungkan file</button>
-      <div class="loading" id="loading" role="status" aria-live="polite">
-        <span class="spinner" aria-hidden="true"></span>
-        <div style="flex:1">Menyusun workbook...
-          <div class="loading-track" aria-hidden="true"></div>
-        </div>
+      <h2 class="section-title">⚙️ Opsi Penggabungan</h2>
+      <div class="field-grid">
+        <label class="field" for="mode-select">Ambil sheet
+          <select id="mode-select"><option value="all">Semua sheet</option><option value="specific">Sheet tertentu</option></select>
+        </label>
+        <label class="field" for="sheet-input">Nama sheet
+          <input id="sheet-input" type="text" value="Sheet1" disabled>
+        </label>
+        <label class="field" for="header-input">Baris header
+          <input id="header-input" type="number" value="1" min="0" max="30" inputmode="numeric">
+        </label>
       </div>
-      <div class="status" id="api-status" role="status" aria-live="polite">Memeriksa Python API...</div>
-      <button class="action-button secondary" id="retry-api-button" type="button" hidden>Aktifkan ulang Python API</button>
-      <div class="status" id="status" role="status" aria-live="polite">Pilih sedikitnya 2 file Excel atau CSV untuk memulai.</div>
-      <button class="action-button secondary" id="download-button" type="button" disabled><span aria-hidden="true">↓</span> Unduh hasil XLSX</button>
-      <p class="notice">Semua file digabung menjadi satu sheet. Urutan kolom mengikuti XLSX pertama jika tersedia, atau file pertama. Format asli dipertahankan bila ada file XLSX.</p>
+      <div class="check-list">
+        <label class="check-label"><input type="checkbox" id="source-check" checked><span>Tambah kolom “Sumber File” dan “Nama Sheet”</span></label>
+        <label class="check-label"><input type="checkbox" id="skip-empty-check" checked><span>Lewati sheet kosong</span></label>
+      </div>
+      <p class="field-hint">Baris header 0 berarti tanpa judul; nama kolom dibuat otomatis.</p>
+      <label class="field output-field" for="output-input">Nama file output
+        <input id="output-input" type="text" value="HASIL_GABUNGAN.xlsx" placeholder="nama-file.xlsx">
+      </label>
+      <div class="progress-wrap" role="progressbar" aria-label="Kemajuan penggabungan" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-wrap"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="progress-status" id="progress-status" role="status" aria-live="polite">Siap.</div>
+      <button class="action-button" id="compile-button" type="button" disabled><span aria-hidden="true">▶</span> Gabungkan sekarang</button>
+      <div class="status" id="status" role="status" aria-live="polite">Tambahkan file Excel atau CSV untuk memulai.</div>
     </aside>
   </section>
+  <section class="log-card" aria-label="Log proses">
+    <div class="section-title"><h2 class="section-title" style="margin:0">📝 Log Proses</h2><button class="action-button secondary" id="clear-log-button" type="button">Bersihkan</button></div>
+    <div class="log-box" id="process-log" role="log" aria-live="polite" aria-relevant="additions"></div>
+  </section>
+  <p class="privacy-note">🔒 Semua proses berjalan 100% di browser Anda. File tidak diunggah ke server.</p>
 </main>
 <script>
-  const MAX_FILES = 20;
-  const MAX_BYTES = 500 * 1024 * 1024;
+  const SUPPORTED_EXTENSIONS = /\.(xlsx|xlsm|xls|csv)$/i;
   const selectedFiles = [];
-  let outputBlob = null;
-  let outputUrl = null;
   let compiling = false;
-  let apiReady = false;
-  let apiCheckPromise = null;
+  let xlsxLoadPromise = null;
 
   const fileInput = document.getElementById('file-input');
+  const folderInput = document.getElementById('folder-input');
   const uploadTrigger = document.getElementById('upload-trigger');
   const fileList = document.getElementById('source-files');
   const compileButton = document.getElementById('compile-button');
-  const downloadButton = document.getElementById('download-button');
-  const apiStatusBox = document.getElementById('api-status');
-  const retryAPIButton = document.getElementById('retry-api-button');
   const statusBox = document.getElementById('status');
-  const loading = document.getElementById('loading');
+  const progressFill = document.getElementById('progress-fill');
+  const progressWrap = document.getElementById('progress-wrap');
+  const progressStatus = document.getElementById('progress-status');
+  const logBox = document.getElementById('process-log');
 
   function formatBytes(size) {
     if (size < 1024) return `${size} B`;
     if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(size / (1024 * 1024)).toFixed(2)} MB`;
   }
 
   function setStatus(message, state = '') {
@@ -240,96 +289,66 @@
     statusBox.className = `status${state ? ` ${state}` : ''}`;
   }
 
-  async function checkAPIStatus() {
-    if (apiCheckPromise) return apiCheckPromise;
-    apiReady = false;
-    retryAPIButton.hidden = true;
-    apiStatusBox.textContent = 'Mengaktifkan Python API...';
-    apiStatusBox.className = 'status';
-    updateControls();
-    apiCheckPromise = (async () => {
-      let lastError;
-      for (let attempt = 0; attempt < 8; attempt++) {
-        try {
-          const response = await fetch('/api/health', {
-            cache: 'no-store',
-            signal: AbortSignal.timeout(8000),
-          });
-          if (response.status === 404) {
-            throw Object.assign(new Error('API tidak tersedia pada hosting statis ini.'), {retryable: false});
-          }
-          if (!response.ok) throw new Error(`Server merespons ${response.status}`);
-          const result = await response.json();
-          if (result.status !== 'ok') throw new Error(result.error || 'API tidak siap');
-          apiReady = true;
-          apiStatusBox.textContent = result.cmdb_storage === 'postgresql' && result.postgres === 'ok'
-            ? 'Python API aktif · PostgreSQL terhubung.'
-            : 'Python API aktif · penyimpanan CMDB menggunakan SQLite.';
-          apiStatusBox.className = 'status success';
-          updateControls();
-          return;
-        } catch (error) {
-          lastError = error;
-          if (error.retryable === false) break;
-          if (attempt < 7) {
-            apiStatusBox.textContent = 'Python API sedang dinyalakan. Menunggu service siap...';
-            await new Promise(resolve => setTimeout(resolve, Math.min((attempt + 1) * 1000, 5000)));
-          }
-        }
-      }
-      apiStatusBox.textContent = lastError?.retryable === false
-        ? lastError.message
-        : 'Python API belum merespons. Periksa deployment, lalu coba aktifkan kembali.';
-      apiStatusBox.className = 'status error';
-      retryAPIButton.hidden = false;
-      updateControls();
-    })();
-    try {
-      await apiCheckPromise;
-    } finally {
-      apiCheckPromise = null;
-    }
+  function setProgress(percent, message) {
+    const value = Math.max(0, Math.min(100, percent));
+    progressFill.style.width = `${value}%`;
+    progressWrap.setAttribute('aria-valuenow', String(Math.round(value)));
+    if (message !== undefined) progressStatus.textContent = message;
   }
 
-  function clearOutput() {
-    outputBlob = null;
-    downloadButton.disabled = true;
-    if (outputUrl) URL.revokeObjectURL(outputUrl);
-    outputUrl = null;
+  function log(message, state = '') {
+    const line = document.createElement('div');
+    line.className = `log-line${state ? ` ${state}` : ''}`;
+    line.textContent = message || '\u00a0';
+    logBox.append(line);
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+
+  function loadXLSX() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    if (xlsxLoadPromise) return xlsxLoadPromise;
+    xlsxLoadPromise = new Promise((resolve, reject) => {
+      const cdns = [
+        'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+        'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+      ];
+      let index = 0;
+      const tryNext = () => {
+        if (index >= cdns.length) {
+          xlsxLoadPromise = null;
+          reject(new Error('Library Excel gagal dimuat. Periksa koneksi internet, lalu muat ulang halaman.'));
+          return;
+        }
+        const script = document.createElement('script');
+        script.src = cdns[index++];
+        script.onload = () => window.XLSX ? resolve(window.XLSX) : tryNext();
+        script.onerror = tryNext;
+        document.head.append(script);
+      };
+      tryNext();
+    });
+    return xlsxLoadPromise;
   }
 
   function updateControls() {
-    const totalBytes = selectedFiles.reduce((total, file) => total + file.size, 0);
-    const hasEnoughFiles = selectedFiles.length >= 2;
-    const hasXlsx = selectedFiles.some(file => /\.xlsx$/i.test(file.name));
-    document.getElementById('file-count').textContent = `${selectedFiles.length} file${selectedFiles.length === 1 ? '' : 's'}`;
-    document.getElementById('total-size').textContent = formatBytes(totalBytes);
+    document.getElementById('file-count').textContent = `${selectedFiles.length} file`;
+    document.getElementById('total-size').textContent = formatBytes(
+      selectedFiles.reduce((total, file) => total + file.size, 0),
+    );
     document.getElementById('empty-note').hidden = selectedFiles.length > 0;
-    compileButton.disabled = compiling || !apiReady || !hasEnoughFiles;
+    compileButton.disabled = compiling || selectedFiles.length === 0 || !window.XLSX;
     uploadTrigger.disabled = compiling;
-    fileList.querySelectorAll('.remove-file').forEach(button => { button.disabled = compiling; });
-    document.getElementById('upload-trigger').setAttribute('aria-label', `Tambah file, ${selectedFiles.length} dipilih`);
-    const fileGuide = document.getElementById('guide-files');
-    const headersGuide = document.getElementById('guide-headers');
-    const apiGuide = document.getElementById('guide-api');
-    fileGuide.textContent = hasEnoughFiles
-      ? `${selectedFiles.length} file dipilih.`
-      : `Tambahkan ${2 - selectedFiles.length} file lagi (maksimal 20).`;
-    headersGuide.textContent = hasXlsx
-      ? 'Urutan kolom dan format mengikuti XLSX pertama.'
-      : 'Urutan kolom mengikuti file pertama; hasil dibuat satu sheet.';
-    fileGuide.className = `guide-item${hasEnoughFiles ? ' ready' : selectedFiles.length ? ' current' : ''}`;
-    headersGuide.className = `guide-item${hasEnoughFiles ? ' ready' : ' current'}`;
-    const apiUnavailable = apiStatusBox.classList.contains('error');
-    apiGuide.className = `guide-item${apiReady ? ' ready' : apiUnavailable ? ' error' : ' current'}`;
-    apiGuide.textContent = apiReady
-      ? 'Python API siap digunakan.'
-      : apiUnavailable ? 'API belum tersedia. Periksa panel proses.' : 'Menunggu Python API siap.';
-    const capacityMeter = document.getElementById('capacity-meter');
-    const capacityPercent = Math.min(100, Math.round(totalBytes / MAX_BYTES * 100));
-    capacityMeter.setAttribute('aria-valuenow', String(capacityPercent));
-    capacityMeter.classList.toggle('near-limit', capacityPercent >= 85);
-    document.getElementById('capacity-fill').style.width = `${capacityPercent}%`;
+    document.getElementById('add-files-button').disabled = compiling;
+    document.getElementById('add-folder-button').disabled = compiling;
+    document.getElementById('clear-files-button').disabled = compiling || selectedFiles.length === 0;
+    document.getElementById('mode-select').disabled = compiling;
+    document.getElementById('sheet-input').disabled = compiling || document.getElementById('mode-select').value !== 'specific';
+    document.getElementById('header-input').disabled = compiling;
+    document.getElementById('source-check').disabled = compiling;
+    document.getElementById('skip-empty-check').disabled = compiling;
+    document.getElementById('output-input').disabled = compiling;
+    fileList.querySelectorAll('button').forEach(button => { button.disabled = compiling || button.dataset.boundary === 'true'; });
   }
 
   function renderFiles() {
@@ -340,144 +359,310 @@
       const kind = document.createElement('span');
       kind.className = 'file-kind';
       kind.textContent = file.name.split('.').pop().toUpperCase();
-      const isTemplate = /\.xlsx$/i.test(file.name);
-      kind.classList.toggle('template', isTemplate);
-      kind.title = isTemplate ? 'Mempertahankan format pada hasil' : 'File sumber';
       kind.setAttribute('aria-hidden', 'true');
       const copy = document.createElement('div');
       copy.className = 'file-copy';
       const name = document.createElement('div');
       name.className = 'file-name';
-      name.textContent = file.name;
+      name.textContent = file.webkitRelativePath || file.name;
+      name.title = file.webkitRelativePath || file.name;
       const size = document.createElement('div');
       size.className = 'file-size';
       size.textContent = formatBytes(file.size);
       copy.append(name, size);
-      const remove = document.createElement('button');
-      remove.className = 'remove-file';
-      remove.type = 'button';
-      remove.disabled = compiling;
-      remove.setAttribute('aria-label', `Hapus ${file.name}`);
-      remove.textContent = '×';
-      remove.addEventListener('click', () => {
-        if (compiling) return;
-        selectedFiles.splice(index, 1);
-        renderFiles();
-        updateControls();
-        clearOutput();
-        setStatus(selectedFiles.length >= 2 ? 'File siap digabung.' : 'Pilih sedikitnya 2 file untuk memulai.');
-      });
-      item.append(kind, copy, remove);
+      const controls = document.createElement('div');
+      controls.className = 'file-controls';
+      for (const [action, label, symbol, disabled] of [
+        ['up', 'Naikkan urutan', '↑', index === 0],
+        ['down', 'Turunkan urutan', '↓', index === selectedFiles.length - 1],
+        ['remove', 'Hapus file', '×', false],
+      ]) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = action === 'remove' ? 'remove-file' : 'file-order';
+        button.dataset.action = action;
+        button.dataset.index = String(index);
+        button.dataset.boundary = String(disabled);
+        button.disabled = compiling || disabled;
+        button.setAttribute('aria-label', `${label}: ${file.webkitRelativePath || file.name}`);
+        button.textContent = symbol;
+        controls.append(button);
+      }
+      item.append(kind, copy, controls);
       fileList.append(item);
     }
   }
 
-  function addFiles(files) {
+  function addFiles(incoming) {
     if (compiling) return;
-    const supported = files.filter(file => /\.(xlsx|xls|csv)$/i.test(file.name));
-    const invalidCount = files.length - supported.length;
-    const initialCount = selectedFiles.length;
     let added = 0;
-    for (const file of supported) {
-      if (selectedFiles.length >= MAX_FILES) break;
-      if (selectedFiles.some(existing => existing.name === file.name && existing.size === file.size && existing.lastModified === file.lastModified)) continue;
+    let ignored = 0;
+    for (const file of incoming) {
+      if (!SUPPORTED_EXTENSIONS.test(file.name) || file.name.startsWith('~$')) {
+        ignored++;
+        continue;
+      }
+      const path = file.webkitRelativePath || file.name;
+      const duplicate = selectedFiles.some(existing =>
+        (existing.webkitRelativePath || existing.name) === path
+        && existing.size === file.size
+        && existing.lastModified === file.lastModified,
+      );
+      if (duplicate) continue;
       selectedFiles.push(file);
       added++;
     }
-    const totalBytes = selectedFiles.reduce((total, file) => total + file.size, 0);
-    if (totalBytes > MAX_BYTES) {
-      selectedFiles.splice(initialCount);
-      setStatus('Total ukuran file maksimal 500 MB.', 'error');
-    } else if (invalidCount) {
-      setStatus('Sebagian file dilewati. Gunakan XLSX, XLS, atau CSV.', 'error');
-    } else if (selectedFiles.length >= MAX_FILES && added < supported.length) {
-      setStatus('Maksimal 20 file.', 'error');
-    } else if (added) {
-      setStatus(`${added} file ditambahkan.`, 'success');
-    } else if (supported.length) {
-      setStatus('Semua file tersebut sudah ada dalam daftar.');
-    } else if (files.length) {
-      setStatus('Pilih file XLSX, XLS, atau CSV.', 'error');
-    }
     renderFiles();
     updateControls();
-    clearOutput();
+    if (added) {
+      clearLog();
+      setStatus(`${added} file ditambahkan.${ignored ? ` ${ignored} file dengan format tidak didukung dilewati.` : ''}`, 'success');
+      log(`➕ ${added} file ditambahkan. Total: ${selectedFiles.length}`, 'dim');
+    } else if (ignored) {
+      setStatus('Pilih file XLSX, XLSM, XLS, atau CSV.', 'error');
+    } else if (incoming.length) {
+      setStatus('File yang dipilih sudah ada dalam daftar.');
+    }
+    setProgress(0, 'Siap.');
   }
 
-  uploadTrigger.addEventListener('click', () => {
-    uploadTrigger.classList.remove('pop');
-    void uploadTrigger.offsetWidth;
-    uploadTrigger.classList.add('pop');
-    fileInput.click();
+  function clearLog() {
+    logBox.replaceChildren();
+  }
+
+  function readFile(file, asText = false) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(asText ? reader.result : new Uint8Array(reader.result));
+      reader.onerror = () => reject(new Error(`Gagal membaca file ${file.name}.`));
+      if (asText) reader.readAsText(file, 'UTF-8');
+      else reader.readAsArrayBuffer(file);
+    });
+  }
+
+  async function loadWorkbook(file, XLSX) {
+    if (/\.csv$/i.test(file.name)) {
+      return XLSX.read(await readFile(file, true), {type: 'string'});
+    }
+    return XLSX.read(await readFile(file), {type: 'array', cellDates: true});
+  }
+
+  function extractSheetData(aoa, headerRow) {
+    if (!aoa?.length) return null;
+    let columns;
+    let rows;
+    if (headerRow > 0) {
+      const headerIndex = headerRow - 1;
+      if (aoa.length <= headerIndex) return null;
+      columns = aoa[headerIndex].map((value, index) => {
+        const name = value === null || value === undefined ? '' : String(value).trim();
+        return name || `Kolom ${index + 1}`;
+      });
+      rows = aoa.slice(headerIndex + 1);
+    } else {
+      const maxColumns = aoa.reduce((max, row) => Math.max(max, row.length), 0);
+      columns = Array.from({length: maxColumns}, (_, index) => `Kolom ${index + 1}`);
+      rows = aoa;
+    }
+    const seen = new Map();
+    columns = columns.map(name => {
+      const count = seen.get(name) || 0;
+      seen.set(name, count + 1);
+      return count ? `${name} (${count + 1})` : name;
+    });
+    rows = rows.filter(row => row.some(value => value !== '' && value !== null && value !== undefined));
+    return rows.length ? {columns, rows} : null;
+  }
+
+  async function runMerge() {
+    if (!selectedFiles.length || compiling) return;
+    const mode = document.getElementById('mode-select').value;
+    const sheetName = document.getElementById('sheet-input').value.trim();
+    if (mode === 'specific' && !sheetName) {
+      setStatus('Masukkan nama sheet yang ingin diambil.', 'error');
+      return;
+    }
+    const rawHeader = Number.parseInt(document.getElementById('header-input').value, 10);
+    const headerRow = Number.isFinite(rawHeader) ? Math.min(30, Math.max(0, rawHeader)) : 0;
+    document.getElementById('header-input').value = String(headerRow);
+    const addSource = document.getElementById('source-check').checked;
+    const skipEmpty = document.getElementById('skip-empty-check').checked;
+    const outputInput = document.getElementById('output-input');
+    let outputName = outputInput.value.trim() || 'HASIL_GABUNGAN.xlsx';
+    if (!/\.xlsx?$/i.test(outputName)) outputName += '.xlsx';
+    outputInput.value = outputName;
+
+    compiling = true;
+    updateControls();
+    setProgress(0, 'Memulai...');
+    setStatus('Memproses file di browser...');
+    log('');
+    log('═'.repeat(48), 'dim');
+    log(`Mulai menggabungkan ${selectedFiles.length} file...`);
+    const columnOrder = [];
+    const columnSet = new Set();
+    const rowsData = [];
+    const addColumn = name => {
+      if (!columnSet.has(name)) {
+        columnSet.add(name);
+        columnOrder.push(name);
+      }
+    };
+    if (addSource) {
+      addColumn('Sumber File');
+      addColumn('Nama Sheet');
+    }
+
+    try {
+      const XLSX = await loadXLSX();
+      for (let index = 0; index < selectedFiles.length; index++) {
+        const file = selectedFiles[index];
+        const displayName = file.webkitRelativePath || file.name;
+        log(`[${index + 1}/${selectedFiles.length}] 📄 ${displayName}`);
+        setProgress(index / selectedFiles.length * 100, `Memproses ${index + 1}/${selectedFiles.length}...`);
+        await new Promise(resolve => setTimeout(resolve, 0));
+        try {
+          const workbook = await loadWorkbook(file, XLSX);
+          let sheetNames = workbook.SheetNames.slice();
+          if (mode === 'specific') {
+            if (!sheetNames.includes(sheetName)) throw new Error(`Sheet "${sheetName}" tidak ditemukan`);
+            sheetNames = [sheetName];
+          }
+          for (const currentSheet of sheetNames) {
+            const worksheet = workbook.Sheets[currentSheet];
+            if (!worksheet) continue;
+            let aoa;
+            try {
+              aoa = XLSX.utils.sheet_to_json(worksheet, {
+                header: 1,
+                defval: '',
+                blankrows: false,
+                raw: true,
+              });
+            } catch (error) {
+              log(`   ⚠ Gagal membaca sheet "${currentSheet}": ${error.message}`, 'error');
+              continue;
+            }
+            const extracted = extractSheetData(aoa, headerRow);
+            if (!extracted) {
+              if (skipEmpty) log(`   ⏭ Sheet "${currentSheet}" kosong, dilewati`, 'dim');
+              continue;
+            }
+            extracted.columns.forEach(addColumn);
+            for (const row of extracted.rows) {
+              const record = Object.create(null);
+              if (addSource) {
+                record['Sumber File'] = displayName;
+                record['Nama Sheet'] = currentSheet;
+              }
+              for (let column = 0; column < extracted.columns.length; column++) {
+                const value = row[column];
+                record[extracted.columns[column]] = value === undefined || value === null ? '' : value;
+              }
+              rowsData.push(record);
+            }
+            log(`   ✓ Sheet "${currentSheet}": ${extracted.rows.length} baris × ${extracted.columns.length} kolom`, 'ok');
+          }
+        } catch (error) {
+          log(`   ⚠ Gagal dibaca: ${error.message || error}`, 'error');
+        }
+      }
+
+      setProgress(95, 'Menyusun file output...');
+      await new Promise(resolve => setTimeout(resolve, 0));
+      if (!rowsData.length) {
+        log('❌ Tidak ada data yang bisa digabungkan.', 'error');
+        setProgress(0, 'Gagal: tidak ada data.');
+        setStatus('Tidak ada data yang bisa digabungkan.', 'error');
+        return;
+      }
+      const aoa = [columnOrder.slice()];
+      for (const record of rowsData) {
+        aoa.push(columnOrder.map(column => {
+          const value = record[column];
+          return value === undefined || value === null ? '' : value;
+        }));
+      }
+      const worksheet = XLSX.utils.aoa_to_sheet(aoa, {cellDates: true});
+      worksheet['!cols'] = columnOrder.map((name, columnIndex) => {
+        let maxLength = String(name).length;
+        const limit = Math.min(aoa.length, 300);
+        for (let rowIndex = 1; rowIndex < limit; rowIndex++) {
+          const value = aoa[rowIndex][columnIndex];
+          if (value === null || value === undefined) continue;
+          const text = value instanceof Date ? '00/00/0000' : String(value);
+          maxLength = Math.max(maxLength, text.length);
+        }
+        return {wch: Math.min(Math.max(10, maxLength + 2), 60)};
+      });
+      const outputWorkbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(outputWorkbook, worksheet, 'Gabungan');
+      log(`💾 Menyimpan ke: ${outputName}`);
+      XLSX.writeFile(outputWorkbook, outputName, {cellDates: true, compression: true});
+      setProgress(100, 'Selesai ✅');
+      setStatus(`Berhasil: ${rowsData.length} baris × ${columnOrder.length} kolom. File ${outputName} diunduh.`, 'success');
+      log(`✅ SELESAI! Total ${rowsData.length} baris, ${columnOrder.length} kolom.`, 'ok');
+      log(`📁 File: ${outputName}`, 'ok');
+    } catch (error) {
+      console.error(error);
+      log(`❌ ERROR: ${error.message || error}`, 'error');
+      setProgress(0, 'Gagal.');
+      setStatus(error.message || 'Penggabungan gagal.', 'error');
+    } finally {
+      compiling = false;
+      updateControls();
+    }
+  }
+
+  document.getElementById('add-files-button').addEventListener('click', () => fileInput.click());
+  document.getElementById('add-folder-button').addEventListener('click', () => folderInput.click());
+  document.getElementById('clear-files-button').addEventListener('click', () => {
+    if (!selectedFiles.length || !window.confirm('Hapus semua file dari daftar?')) return;
+    selectedFiles.length = 0;
+    renderFiles();
+    updateControls();
+    setProgress(0, 'Siap.');
+    setStatus('Semua file dihapus.');
   });
-  fileInput.addEventListener('change', event => {
-    addFiles(Array.from(event.target.files || []));
-    fileInput.value = '';
+  document.getElementById('mode-select').addEventListener('change', updateControls);
+  document.getElementById('clear-log-button').addEventListener('click', clearLog);
+  fileList.addEventListener('click', event => {
+    const button = event.target.closest('button[data-action]');
+    if (!button || compiling) return;
+    const index = Number(button.dataset.index);
+    const action = button.dataset.action;
+    if (action === 'remove') selectedFiles.splice(index, 1);
+    if (action === 'up' && index > 0) [selectedFiles[index - 1], selectedFiles[index]] = [selectedFiles[index], selectedFiles[index - 1]];
+    if (action === 'down' && index < selectedFiles.length - 1) [selectedFiles[index + 1], selectedFiles[index]] = [selectedFiles[index], selectedFiles[index + 1]];
+    renderFiles();
+    updateControls();
+    setProgress(0, 'Siap.');
+    setStatus('Urutan file diperbarui.');
+  });
+  for (const input of [fileInput, folderInput]) {
+    input.addEventListener('change', event => {
+      addFiles(Array.from(event.target.files || []));
+      input.value = '';
+    });
+  }
+  uploadTrigger.addEventListener('click', () => {
+    if (!compiling) fileInput.click();
   });
   uploadTrigger.addEventListener('dragover', event => {
     event.preventDefault();
-    if (compiling) return;
-    uploadTrigger.classList.add('drag-active');
+    if (!compiling) uploadTrigger.classList.add('drag-active');
   });
-  uploadTrigger.addEventListener('dragleave', () => { uploadTrigger.classList.remove('drag-active'); });
+  uploadTrigger.addEventListener('dragleave', event => {
+    if (!uploadTrigger.contains(event.relatedTarget)) uploadTrigger.classList.remove('drag-active');
+  });
   uploadTrigger.addEventListener('drop', event => {
     event.preventDefault();
     uploadTrigger.classList.remove('drag-active');
-    if (compiling) return;
-    addFiles(Array.from(event.dataTransfer?.files || []));
+    if (!compiling) addFiles(Array.from(event.dataTransfer?.files || []));
   });
-
-  compileButton.addEventListener('click', async () => {
-    if (compiling || !apiReady || selectedFiles.length < 2) return;
-    compiling = true;
-    clearOutput();
-    loading.classList.add('show');
-    setStatus('Upload dan proses sedang berjalan...');
-    updateControls();
-    try {
-      const form = new FormData();
-      for (const file of selectedFiles) form.append('files', file, file.name);
-      const response = await fetch('/api/excel/compile', {
-        method: 'POST',
-        body: form,
-      });
-      if (!response.ok) {
-        let message = `Server merespons ${response.status}`;
-        try {
-          const result = await response.json();
-          if (result.error) message = result.error;
-        } catch (error) {
-          if (response.status === 404) message = 'API Excel Compiler tidak tersedia pada hosting statis ini.';
-        }
-        throw new Error(message);
-      }
-      outputBlob = await response.blob();
-      if (!outputBlob.size) throw new Error('Server mengembalikan file kosong.');
-      outputUrl = URL.createObjectURL(outputBlob);
-      downloadButton.disabled = false;
-      downloadButton.classList.remove('download-ready');
-      void downloadButton.offsetWidth;
-      downloadButton.classList.add('download-ready');
-      setStatus(`Selesai. File hasil berukuran ${formatBytes(outputBlob.size)}.`, 'success');
-    } catch (error) {
-      setStatus(error.message || 'Kompilasi gagal.', 'error');
-    } finally {
-      compiling = false;
-      loading.classList.remove('show');
-      updateControls();
-    }
-  });
-  retryAPIButton.addEventListener('click', checkAPIStatus);
-
-  downloadButton.addEventListener('click', () => {
-    if (!outputBlob || !outputUrl) return;
-    const link = document.createElement('a');
-    link.href = outputUrl;
-    link.download = `compiled-${new Date().toISOString().slice(0, 10)}.xlsx`;
-    document.body.append(link);
-    link.click();
-    link.remove();
-  });
+  window.addEventListener('dragover', event => event.preventDefault());
+  window.addEventListener('drop', event => event.preventDefault());
+  compileButton.addEventListener('click', runMerge);
 
   const themeButton = document.getElementById('theme-toggle');
   function updateTheme(theme) {
@@ -490,8 +675,32 @@
     localStorage.setItem('bcp-theme', next);
     updateTheme(next);
   });
+  updateTheme(document.documentElement.getAttribute('data-theme') || 'light');
+  document.getElementById('header-input').addEventListener('change', event => {
+    const value = Number.parseInt(event.target.value, 10);
+    event.target.value = String(Number.isFinite(value) ? Math.min(30, Math.max(0, value)) : 0);
+  });
+  document.getElementById('output-input').addEventListener('input', () => {
+    if (!compiling) setStatus('Nama file output diperbarui.');
+  });
+  document.getElementById('source-check').addEventListener('change', () => {
+    if (!compiling) setStatus('Opsi sumber file diperbarui.');
+  });
+  document.getElementById('skip-empty-check').addEventListener('change', () => {
+    if (!compiling) setStatus('Opsi sheet kosong diperbarui.');
+  });
+  renderFiles();
   updateControls();
-  checkAPIStatus();
+  log('Selamat datang di Excel Compiler! Tambahkan file Excel/XLSM/CSV untuk mulai.', 'ok');
+  log('Seluruh proses dilakukan lokal di browser; tidak ada file yang dikirim ke server.', 'dim');
+  loadXLSX().then(() => {
+    updateControls();
+    setStatus('Siap. Pilih file lalu atur opsi penggabungan.');
+  }).catch(error => {
+    updateControls();
+    setStatus(error.message, 'error');
+    log(`❌ ${error.message}`, 'error');
+  });
 </script>
 </body>
 </html>

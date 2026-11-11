@@ -16,9 +16,7 @@ Dashboard POT Automated menampilkan sapaan sesuai waktu setempat, cuaca terkini 
 
 ## Excel Compiler
 
-Pilih **Excel Compiler** pada menu awal untuk menggabungkan 2 sampai 20 file `.xlsx`, `.xls`, atau `.csv` menjadi tepat satu sheet. File `.xlsx` tidak wajib: bila tersedia, urutan kolom dan format mengikuti file XLSX pertama; jika tidak, urutan kolom mengikuti file pertama dan workbook XLSX baru dibuat. Baris dari file lain dipetakan berdasarkan header (tidak peka kapitalisasi dan spasi). Header yang berbeda, duplikat, atau kosong ditolak agar nilai tidak bergeser. Antarmuka mendukung pilih file dan drag-and-drop, menampilkan status kesiapan API serta penggunaan batas ukuran upload, dan mengunci daftar file selama proses kompilasi. Batas total upload adalah 500 MiB. Upload dan workbook dibaca/ditulis bertahap melalui file sementara agar penggunaan memori tetap terkendali.
-
-Fitur ini menggunakan Python API terbuka pada deployment Docker. Saat halaman Excel Compiler dibuka, pengecekan kesehatan API otomatis membangunkan service Python yang sedang tidur, lalu mencoba ulang selama proses startup. GitHub Pages bersifat statis dan tidak menjalankan API Python, sehingga Excel Compiler memerlukan deployment server.
+Pilih **Excel Compiler** pada menu awal untuk menggabungkan file `.xlsx`, `.xlsm`, `.xls`, atau `.csv` menjadi satu sheet. Pemrosesan berjalan lokal di browser; file tidak diunggah ke server dan fitur dapat digunakan pada GitHub Pages. Anda dapat memilih semua sheet atau nama sheet tertentu, mengatur baris header (atau memakai nama kolom otomatis), menambahkan kolom sumber file/nama sheet, melewati sheet kosong, menambah file dari folder, serta mengubah urutan input. Header kolom yang sama digabungkan, sedangkan kolom yang tidak ada pada suatu sheet akan dibiarkan kosong. Hasil diunduh sebagai file XLSX dengan lebar kolom otomatis.
 
 ## Database CMDB
 
@@ -26,7 +24,7 @@ Jika `CMDB_DATABASE_URL` atau `DATABASE_URL` tersedia, PostgreSQL menjadi penyim
 
 Setelah CMDB di-chunk untuk kompilasi, API juga menyimpan cache site sementara pada PostgreSQL bila `CMDB_STAGING_DATABASE_URL` atau `DATABASE_URL` tersedia. API membuat tabel `cmdb_staging_sessions` dan `cmdb_staging_chunks` saat startup; tiap sesi dibatasi 256 MiB. Data sesi dihapus setelah proses kompilasi berhasil maupun gagal; jika proses terputus, sesi kedaluwarsa setelah 24 jam secara default dan dibersihkan setiap 15 menit. Atur `CMDB_STAGING_TTL_SECONDS` ke nilai 60–2592000 untuk mengubah masa kedaluwarsa. Staging bersifat sementara dan terpisah dari file CMDB permanen.
 
-Jalankan `sh deploy.sh` untuk memulai layanan. Layanan web di-bind ke `127.0.0.1` secara default dan port dapat diubah, misalnya `PORT=9000 sh deploy.sh`. Endpoint API tidak memiliki autentikasi, jadi jangan paparkan ke jaringan publik tanpa proteksi akses pada reverse proxy. Untuk akses jaringan, gunakan HTTPS dan batasi akses ke pengguna/jaringan yang berwenang. GitHub Pages bersifat statis dan tidak menyediakan API kompilasi atau penyimpanan CMDB.
+Jalankan `sh deploy.sh` untuk memulai layanan. Layanan web di-bind ke `127.0.0.1` secara default dan port dapat diubah, misalnya `PORT=9000 sh deploy.sh`. Endpoint API tidak memiliki autentikasi, jadi jangan paparkan ke jaringan publik tanpa proteksi akses pada reverse proxy. Untuk akses jaringan, gunakan HTTPS dan batasi akses ke pengguna/jaringan yang berwenang. Excel Compiler tetap dapat digunakan pada GitHub Pages karena file diproses di browser; GitHub Pages tidak menyediakan API untuk POT Automated atau penyimpanan CMDB server.
 
 ## Deploy dan auto-wake di Railway
 
@@ -35,9 +33,9 @@ Railway tidak menjalankan `sh deploy.sh` dari browser. Sebagai gantinya, deploy 
 1. Buat service PostgreSQL dan service API dengan Dockerfile `Dockerfile.api`. Atur `PORT=8000`, `RAILWAY_RUN_UID=0`, dan `DATABASE_URL` sebagai reference ke URL koneksi PostgreSQL (contoh Railway: `${{Postgres.DATABASE_URL}}`, sesuaikan nama service PostgreSQL). `DATABASE_URL` mengaktifkan penyimpanan CMDB permanen sekaligus staging; API membuat tabel dan memigrasikan CMDB SQLite lama bila tabel Postgres masih kosong. Jangan menempelkan URL atau kredensial database ke source code.
 2. Pada service API, aktifkan **Serverless** di pengaturan deploy Railway dan atur healthcheck path ke `/api/health`. Bila menggunakan `CMDB_DATABASE_URL` atau `CMDB_STAGING_DATABASE_URL` yang berbeda, atur keduanya ke URL service PostgreSQL yang sesuai.
 3. Buat service web dengan Dockerfile `Dockerfile`. Tambahkan public domain untuk service ini, atur target `PORT=80`, lalu atur `API_HOST` ke private domain API, misalnya `excel-api.railway.internal`, dan `API_PORT=8000`.
-4. Pastikan kedua service berada di project dan environment Railway yang sama. Nginx meneruskan `/api/` melalui private network; membuka menu **Excel Compiler** memanggil healthcheck yang membangunkan API bila sedang tidur.
+4. Pastikan kedua service berada di project dan environment Railway yang sama. Nginx meneruskan `/api/` melalui private network; halaman POT Automated menggunakan API untuk memuat cuaca dan berita.
 
-Railway menyebut request pertama setelah tidur dapat mengalami cold start atau sesekali merespons 502; halaman Excel Compiler otomatis mencoba ulang. Healthcheck Railway hanya digunakan untuk validasi deployment, bukan pemantauan berkelanjutan. API tidak memiliki autentikasi, jadi jangan publikasikan domain API secara langsung; aksesnya lewat proxy web tetap terbuka dan perlu dilindungi di lapisan jaringan bila aplikasi dipakai untuk data sensitif.
+Railway menyebut request pertama setelah tidur dapat mengalami cold start atau sesekali merespons 502; halaman yang memakai API dapat memerlukan percobaan ulang. Healthcheck Railway hanya digunakan untuk validasi deployment, bukan pemantauan berkelanjutan. API tidak memiliki autentikasi, jadi jangan publikasikan domain API secara langsung; aksesnya lewat proxy web tetap terbuka dan perlu dilindungi di lapisan jaringan bila aplikasi dipakai untuk data sensitif.
 
 ## Pencocokan site
 
