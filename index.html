@@ -2130,12 +2130,15 @@ async function process() {
     }
 
     const keyGroups = new Map();
+    function snapshotTimeFromKey(key) {
+      const match = String(key ?? '').match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/);
+      return match ? `${match[1]} ${match[2]}` : String(key ?? '');
+    }
     for (let i = 1; i < segRowsOut.length; i++) {
       const key = String(segRowsOut[i][keyColIdx]??'');
       if (!key) continue;
       if (!keyGroups.has(key)) {
-        const m = key.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/);
-        keyGroups.set(key, {snapshotTime: m ? `${m[1]} ${m[2]}` : key, rows: []});
+        keyGroups.set(key, {snapshotTime: snapshotTimeFromKey(key), rows: []});
       }
       keyGroups.get(key).rows.push(segRowsOut[i]);
     }
@@ -2185,6 +2188,7 @@ async function process() {
     }
     const gdocSites = new Map();
     const expectedGdocSiteIds = new Set();
+    let latestSnapshotTime = '';
     for (let i = 0; i < sdlData.length; i++) {
       const potRow = sdlData[i];
       const sidRaw = String(potRow[sdlSiteIdx] ?? '').trim();
@@ -2199,15 +2203,15 @@ async function process() {
       if (!String(segRow[siteColIdx] ?? '').trim()) segRow[siteColIdx] = sidRaw;
       if (keyColIdx >= 0 && !String(segRow[keyColIdx] ?? '').trim()) segRow[keyColIdx] = potRow[sdlKeyIdx] ?? '';
       const key = String(potRow?.[sdlKeyIdx] ?? segRow[keyColIdx] ?? '');
-      const match = key.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/);
-      const snapshotTime = match ? `${match[1]} ${match[2]}` : key;
+      const snapshotTime = snapshotTimeFromKey(key);
+      if (snapshotTime.localeCompare(latestSnapshotTime) > 0) latestSnapshotTime = snapshotTime;
       const previous = gdocSites.get(sidKey);
       if (!previous || snapshotTime.localeCompare(previous.snapshotTime) >= 0) {
         gdocSites.set(sidKey, {
           potRow,
           siteId: sidRaw,
           segRow,
-          status: gdocStatus(segRow, statusByRow[i]) === 'DOWN' ? 'DOWN' : 'UP',
+          rowStatus: gdocStatus(segRow, statusByRow[i]),
           snapshotTime
         });
       }
@@ -2217,6 +2221,7 @@ async function process() {
       throw new Error(`GDOC kehilangan ${missingGdocSiteIds.length} Site ID dari POT/segmentation: ${missingGdocSiteIds.slice(0, 10).join(', ')}`);
     }
     for (const [sidKey, site] of gdocSites) {
+      site.status = site.snapshotTime.localeCompare(latestSnapshotTime) < 0 ? 'UP' : site.rowStatus;
       if (site.status !== 'UP' && site.status !== 'DOWN') {
         throw new Error(`Status GDOC tidak valid untuk Site ID ${sidKey}`);
       }
