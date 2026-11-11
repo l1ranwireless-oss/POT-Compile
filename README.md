@@ -8,7 +8,7 @@ Pastikan Docker Engine dan Docker Compose plugin tersedia, lalu jalankan:
 sh deploy.sh
 ```
 
-Script membangun image Nginx langsung dari `index.html` terbaru dan menjalankan layanan. Buka `http://localhost:8080`. Port dapat diubah, misalnya `PORT=9000 sh deploy.sh`.
+Script membangun image Nginx dan Python API dari source terbaru, lalu menjalankan layanan web dan API. Buka `http://localhost:8080`. Port dapat diubah, misalnya `PORT=9000 sh deploy.sh`.
 
 Saat halaman dibuka, menu awal menyediakan tautan **Yuk Bikin POT**, **POT Automated**, dan **Excel Compiler**. Tema default menggunakan palet warna sejuk; preferensi mode terang/gelap dapat diubah melalui tombol tema.
 
@@ -16,13 +16,24 @@ Saat halaman dibuka, menu awal menyediakan tautan **Yuk Bikin POT**, **POT Autom
 
 Pilih **Excel Compiler** pada menu awal untuk menggabungkan 2 sampai 20 file `.xlsx`, `.xls`, atau `.csv` menjadi satu sheet. Sertakan setidaknya satu `.xlsx` sebagai template agar workbook hasil mempertahankan sheet dan formatnya; baris dari file lain dipetakan berdasarkan header (tidak peka kapitalisasi dan spasi) dan urutan kolom template. Header yang berbeda, duplikat, atau kosong ditolak agar nilai tidak bergeser. Batas total upload adalah 500 MiB. Upload dan workbook dibaca/ditulis bertahap melalui file sementara agar penggunaan memori tetap terkendali.
 
-Fitur ini menggunakan Python API terbuka pada deployment Docker. GitHub Pages bersifat statis dan tidak menjalankan API Python, sehingga Excel Compiler memerlukan deployment Docker.
+Fitur ini menggunakan Python API terbuka pada deployment Docker. Saat halaman Excel Compiler dibuka, pengecekan kesehatan API otomatis membangunkan service Python yang sedang tidur, lalu mencoba ulang selama proses startup. GitHub Pages bersifat statis dan tidak menjalankan API Python, sehingga Excel Compiler memerlukan deployment server.
 
 ## Database CMDB
 
 API membuat tabel SQLite `cmdb_files` secara otomatis saat pertama kali dijalankan dan menyimpan satu file sumber CMDB pada named volume Docker `cmdb_data`. File CMDB yang telah tersimpan pada format server sebelumnya akan dimigrasikan ke SQLite saat startup. Tidak diperlukan service atau proses database terpisah. Gunakan **Simpan CMDB** untuk penyimpanan pertama, **Update Server** untuk mengganti file, dan **Muat Server** untuk memulihkan salinan server. Cache browser di IndexedDB tetap tersedia untuk pemulihan lokal.
 
 Jalankan `sh deploy.sh` untuk memulai layanan. Layanan web di-bind ke `127.0.0.1` secara default dan port dapat diubah, misalnya `PORT=9000 sh deploy.sh`. Endpoint API tidak memiliki autentikasi, jadi jangan paparkan ke jaringan publik tanpa proteksi akses pada reverse proxy. Untuk akses jaringan, gunakan HTTPS dan batasi akses ke pengguna/jaringan yang berwenang. GitHub Pages bersifat statis dan tidak menyediakan API kompilasi atau penyimpanan CMDB.
+
+## Deploy dan auto-wake di Railway
+
+Railway tidak menjalankan `sh deploy.sh` dari browser. Sebagai gantinya, deploy web dan API sebagai dua service dari repository yang sama:
+
+1. Buat service API dengan Dockerfile `Dockerfile.api`. Tambahkan volume persisten pada mount path `/data`, lalu atur `CMDB_DATABASE_PATH=/data/cmdb.sqlite3`, `PORT=8000`, dan `RAILWAY_RUN_UID=0` agar proses dapat menulis ke volume Railway.
+2. Pada service API, aktifkan **Serverless** di pengaturan deploy Railway dan atur healthcheck path ke `/api/health`. Gunakan satu replica untuk service API yang memakai volume SQLite; volume mempertahankan database ketika service tidur.
+3. Buat service web dengan Dockerfile `Dockerfile`. Tambahkan public domain untuk service ini, atur target `PORT=80`, lalu atur `API_HOST` ke private domain API, misalnya `excel-api.railway.internal`, dan `API_PORT=8000`.
+4. Pastikan kedua service berada di project dan environment Railway yang sama. Nginx meneruskan `/api/` melalui private network; membuka menu **Excel Compiler** memanggil healthcheck yang membangunkan API bila sedang tidur.
+
+Railway menyebut request pertama setelah tidur dapat mengalami cold start atau sesekali merespons 502; halaman Excel Compiler otomatis mencoba ulang. Healthcheck Railway hanya digunakan untuk validasi deployment, bukan pemantauan berkelanjutan. API tidak memiliki autentikasi, jadi jangan publikasikan domain API secara langsung; aksesnya lewat proxy web tetap terbuka dan perlu dilindungi di lapisan jaringan bila aplikasi dipakai untuk data sensitif.
 
 ## Pencocokan site
 

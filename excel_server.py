@@ -130,6 +130,9 @@ def make_handler(database_path):
             self.send_json(404, {"error": "Endpoint tidak ditemukan"})
 
         def do_GET(self):
+            if self.path == "/api/health":
+                self.get_health()
+                return
             if self.path == "/api/cmdb":
                 self.get_cmdb_status()
                 return
@@ -143,6 +146,19 @@ def make_handler(database_path):
                 self.store_cmdb("update")
                 return
             self.send_json(404, {"error": "Endpoint tidak ditemukan"})
+
+        def get_health(self):
+            connection = None
+            try:
+                connection = sqlite3.connect(database_path)
+                connection.execute("SELECT 1 FROM cmdb_files LIMIT 1").fetchone()
+                self.send_json(200, {"status": "ok"})
+            except sqlite3.Error as error:
+                self.log_error("API health check failed: %s", error)
+                self.send_json(500, {"status": "error", "error": "Database CMDB tidak tersedia"})
+            finally:
+                if connection is not None:
+                    connection.close()
 
         def get_cmdb_status(self):
             connection = None
@@ -415,7 +431,8 @@ def make_handler(database_path):
 
 def main():
     database_path = os.environ.get("CMDB_DATABASE_PATH", "/data/cmdb.sqlite3")
-    server = ThreadingHTTPServer(("0.0.0.0", 8000), make_handler(database_path))
+    port = int(os.environ.get("PORT", "8000"))
+    server = ThreadingHTTPServer(("0.0.0.0", port), make_handler(database_path))
     server.serve_forever()
 
 

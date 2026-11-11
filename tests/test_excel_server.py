@@ -62,6 +62,11 @@ class ExcelServerTests(unittest.TestCase):
             ).fetchone()
         self.assertEqual(table, ("cmdb_files",))
 
+    def test_api_health_reports_python_and_cmdb_database_ready(self):
+        with urlopen(self.base_url + "/api/health") as response:
+            self.assertEqual(response.status, 200)
+            self.assertEqual(json.loads(response.read()), {"status": "ok"})
+
     def test_cmdb_database_migrates_existing_server_file(self):
         content = b"Existing server CMDB"
         generation = "a" * 32 + ".bin"
