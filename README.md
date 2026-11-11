@@ -10,11 +10,11 @@ sh deploy.sh
 
 Script membangun image Nginx dan Python API dari source terbaru, lalu menjalankan layanan web dan API. Buka `http://localhost:8080`. Port dapat diubah, misalnya `PORT=9000 sh deploy.sh`.
 
-Saat halaman dibuka, menu awal menyediakan tautan **Yuk Bikin POT**, **POT Automated**, dan **Excel Compiler**. Tema default menggunakan palet warna sejuk; preferensi mode terang/gelap dapat diubah melalui tombol tema.
+Saat halaman dibuka, menu awal menyediakan tautan **Yuk Bikin POT**, **POT Automated**, dan **Excel Compiler**. Tema default menggunakan palet warna sejuk; preferensi mode terang/gelap dapat diubah melalui tombol tema. Inter dan Space Grotesk dimuat dari Google Fonts CDN untuk tipografi; jika CDN tidak tersedia, font sistem digunakan sebagai fallback.
 
 ## Excel Compiler
 
-Pilih **Excel Compiler** pada menu awal untuk menggabungkan 2 sampai 20 file `.xlsx`, `.xls`, atau `.csv` menjadi satu sheet. Sertakan setidaknya satu `.xlsx` sebagai template agar workbook hasil mempertahankan sheet dan formatnya; baris dari file lain dipetakan berdasarkan header (tidak peka kapitalisasi dan spasi) dan urutan kolom template. Header yang berbeda, duplikat, atau kosong ditolak agar nilai tidak bergeser. Batas total upload adalah 500 MiB. Upload dan workbook dibaca/ditulis bertahap melalui file sementara agar penggunaan memori tetap terkendali.
+Pilih **Excel Compiler** pada menu awal untuk menggabungkan 2 sampai 20 file `.xlsx`, `.xls`, atau `.csv` menjadi satu sheet. Antarmuka mendukung pilih file dan drag-and-drop, menampilkan status kesiapan API, dan menjaga daftar file tetap terkunci selama proses kompilasi. Sertakan setidaknya satu `.xlsx` sebagai template agar workbook hasil mempertahankan sheet dan formatnya; baris dari file lain dipetakan berdasarkan header (tidak peka kapitalisasi dan spasi) dan urutan kolom template. Header yang berbeda, duplikat, atau kosong ditolak agar nilai tidak bergeser. Batas total upload adalah 500 MiB. Upload dan workbook dibaca/ditulis bertahap melalui file sementara agar penggunaan memori tetap terkendali.
 
 Fitur ini menggunakan Python API terbuka pada deployment Docker. Saat halaman Excel Compiler dibuka, pengecekan kesehatan API otomatis membangunkan service Python yang sedang tidur, lalu mencoba ulang selama proses startup. GitHub Pages bersifat statis dan tidak menjalankan API Python, sehingga Excel Compiler memerlukan deployment server.
 

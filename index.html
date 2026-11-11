@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Theo-POT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <script>
   (function(){
     const saved = localStorage.getItem('bcp-theme') || 'light';
@@ -277,6 +280,7 @@
   .welcome-overlay[hidden]{display:none}
   .welcome-dialog{width:min(100%,560px);padding:clamp(28px,6vw,46px);border:1px solid var(--border-medium);border-radius:26px;background:var(--bg-elevated);box-shadow:0 22px 64px rgba(30,52,59,.18);text-align:center;animation:welcomeRise .45s cubic-bezier(.2,.75,.25,1) both}
   .welcome-mark{display:grid;place-items:center;width:58px;height:58px;margin:0 auto 20px;border-radius:18px;background:rgba(84,134,147,.09);color:var(--accent-cyan);font-size:27px}
+  .welcome-kicker{margin-bottom:10px;color:var(--accent-cyan);font:700 10px/1.2 'JetBrains Mono',monospace;letter-spacing:1.6px}
   .welcome-dialog h2{margin-bottom:10px;color:var(--text-primary);font-size:clamp(24px,5vw,32px);letter-spacing:-.5px}
   .welcome-dialog p{max-width:390px;margin:0 auto 28px;color:var(--text-secondary);font-size:14px;line-height:1.7}
   .welcome-options{display:grid;gap:12px}
@@ -292,6 +296,26 @@
   .welcome-choice.primary .welcome-choice-icon{background:rgba(255,255,255,.13)}
   .welcome-choice.primary .welcome-choice-copy small,.welcome-choice.primary .welcome-choice-arrow{color:rgba(255,255,255,.84)}
   .welcome-choice.primary:hover{background:linear-gradient(120deg,#496e72,#5c7e82)}
+  body{font-family:'Inter','Segoe UI',system-ui,sans-serif}
+  .header h1,.welcome-dialog h2,.result-card h2{font-family:'Space Grotesk','Inter',sans-serif}
+  .header{position:relative;padding:32px 20px 26px;margin:0 auto 30px;border:1px solid var(--border-subtle);border-radius:24px;background:linear-gradient(135deg,var(--bg-card),rgba(255,255,255,.16));box-shadow:var(--shadow-card);backdrop-filter:blur(16px);overflow:hidden}
+  .header::before{position:absolute;inset:0 auto 0 0;width:4px;background:linear-gradient(180deg,var(--accent-cyan),var(--accent-purple));content:""}
+  .header h1{font-size:clamp(30px,5vw,46px);letter-spacing:-1.8px}
+  .header p{margin-top:7px}
+  .header p:last-child{font-size:11px;opacity:.76}
+  .welcome-dialog{position:relative;overflow:hidden}
+  .welcome-dialog::before{position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,var(--accent-cyan),var(--accent-purple),var(--accent-pink));content:""}
+  .welcome-mark{animation:markFloat 4s ease-in-out infinite}
+  @keyframes markFloat{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-4px) rotate(6deg)}}
+  .welcome-choice{position:relative;overflow:hidden}
+  .welcome-choice::after{position:absolute;inset:0;transform:translateX(-120%);background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.18),transparent 70%);content:"";transition:transform .65s ease}
+  .welcome-choice:hover::after{transform:translateX(120%)}
+  .upload-card{border-radius:20px}
+  .upload-card h2{font-family:'Space Grotesk','Inter',sans-serif}
+  .drop-zone{position:relative}
+  .drop-zone:focus-within{outline:3px solid var(--accent-cyan);outline-offset:3px}
+  .btn:focus-visible,.btn-small:focus-visible,.theme-toggle:focus-visible,.cache-clear-btn:focus-visible{outline:3px solid var(--accent-cyan);outline-offset:3px}
+  ::selection{background:var(--accent-cyan);color:var(--text-inverse)}
   .toast.success{background:var(--bg-elevated)}
   .toast.error,.toast.warn{background:var(--bg-elevated)}
   .cdn-warn{background:rgba(161,111,112,.08);border-color:rgba(161,111,112,.2)}
@@ -315,8 +339,9 @@
 <div class="welcome-overlay" id="welcome-menu">
   <section class="welcome-dialog" role="dialog" aria-modal="true" aria-labelledby="welcome-title" aria-describedby="welcome-description">
     <div class="welcome-mark" aria-hidden="true">✦</div>
-    <h2 id="welcome-title">Welcome to Works</h2>
-    <p id="welcome-description">Berikut layanan yang Theo sajikan</p>
+    <div class="welcome-kicker">WORKSPACE · AUTOMATION TOOLS</div>
+    <h2 id="welcome-title">Pilih tools</h2>
+    <p id="welcome-description">Pilih aplikasi yang ingin Anda gunakan.</p>
     <div class="welcome-options">
       <a class="welcome-choice" id="welcome-yuk-pot" href="https://l1ranwireless-oss.github.io/POT_Biasa" target="_blank" rel="noopener noreferrer">
         <span class="welcome-choice-icon" aria-hidden="true">🧭</span>
@@ -344,9 +369,10 @@
 
 <div class="container" id="main-app" tabindex="-1">
   <div class="header">
+    <div class="welcome-kicker">POT AUTOMATION WORKSPACE</div>
     <h1>Compiler Data POT</h1>
     <p>Gunakan file <b>POT + CMDB</b>; sheet segmentation akan dibuat otomatis.</p>
-    <p><b>Hanya Sekedar Aplikasi</b> · <b>Jangan Lupa Ibadah</b> 
+    <p><b>BCP workflow</b> · Validasi, kompilasi, dan ringkasan insiden dalam satu tempat.</p>
   </div>
 
   <div class="cdn-warn" id="cdn-warn">⚠️ <b>Library Excel gagal dimuat.</b> Periksa koneksi internet.</div>
