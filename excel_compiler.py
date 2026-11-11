@@ -233,10 +233,8 @@ def compile_workbooks(files, output_path=None):
 
         template_index = next(
             (index for index, record in enumerate(records) if Path(record["filename"]).suffix.lower() == ".xlsx"),
-            None,
+            0,
         )
-        if template_index is None:
-            raise ValueError("Sertakan minimal satu file .xlsx sebagai template agar format tetap terjaga")
         template = records[template_index]
         expected_keys = template["keys"]
         for record in records:

@@ -61,12 +61,20 @@ class ExcelCompilerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "antara 2 sampai"):
             compile_workbooks([("input.csv", b"name\nAlpha\n")])
 
-    def test_requires_xlsx_template_to_preserve_format(self):
-        with self.assertRaisesRegex(ValueError, "minimal satu file .xlsx"):
-            compile_workbooks([
-                ("first.csv", b"name\nAlpha\n"),
-                ("second.csv", b"name\nBeta\n"),
-            ])
+    def test_compiles_csv_files_into_a_single_sheet_without_template(self):
+        output = compile_workbooks([
+            ("first.csv", b"name,amount\nAlpha,10\n"),
+            ("second.csv", b"amount,name\n20,Beta\n"),
+        ])
+
+        workbook = load_workbook(io.BytesIO(output), read_only=True)
+        self.assertEqual(len(workbook.sheetnames), 1)
+        self.assertEqual(list(workbook.active.values), [
+            ("name", "amount"),
+            ("Alpha", "10"),
+            ("Beta", "20"),
+        ])
+        workbook.close()
 
     def test_csv_formula_text_is_not_written_as_excel_formula(self):
         template = make_xlsx([["Name"], ["Template"]])

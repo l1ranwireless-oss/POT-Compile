@@ -134,6 +134,28 @@
   @media(max-width:720px){.topbar{margin-bottom:22px}.actions{position:static}.workspace{gap:12px}.upload-guide{margin-top:14px}}
   @media(max-width:420px){body{padding:14px}.topbar{gap:8px}.back-link,.theme-button{padding:9px 11px;font-size:12px}.hero{padding:22px 18px}.upload-area{padding:16px}.upload-footer{flex-wrap:wrap}}
   @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+  :root[data-theme="light"]{--bg:#f3f6f3;--surface:#fff;--surface-muted:#f7faf7;--text:#263b38;--muted:#5c716c;--faint:#81918b;--border:rgba(54,82,74,.14);--accent:#56877d;--green:#668b72;--red:#ad7775;--shadow:0 10px 28px rgba(48,72,65,.08);--grid:rgba(86,135,125,.03)}
+  :root[data-theme="dark"]{--bg:#182522;--surface:#293a35;--surface-muted:#202f2b;--text:#e5eee9;--muted:#b6c8bf;--faint:#90a49a;--border:rgba(218,237,226,.16);--accent:#91bdb0;--green:#a4c6a9;--red:#d5a5a0;--shadow:0 12px 32px rgba(0,0,0,.22);--grid:rgba(145,189,176,.03)}
+  body{background:radial-gradient(ellipse at 12% 0%,color-mix(in srgb,var(--accent) 10%,transparent),transparent 44%),var(--bg)}
+  body::before,body::after{opacity:.1;filter:blur(110px);animation-duration:30s}
+  .hero{background:linear-gradient(135deg,color-mix(in srgb,var(--surface) 96%,transparent),color-mix(in srgb,var(--accent) 6%,var(--surface-muted)));transition:transform .28s ease,border-color .28s ease,box-shadow .28s ease}
+  .hero:hover{border-color:color-mix(in srgb,var(--accent) 38%,var(--border));box-shadow:0 16px 38px color-mix(in srgb,var(--accent) 10%,transparent)}
+  .hero-facts span{transition:transform .2s ease,border-color .2s ease,background .2s ease}
+  .hero-facts span:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--accent) 38%,var(--border));background:var(--surface)}
+  .upload-area,.actions{transition:border-color .24s ease,box-shadow .24s ease,background .24s ease}
+  .upload-area:hover,.actions:hover{border-color:color-mix(in srgb,var(--accent) 28%,var(--border));box-shadow:0 14px 34px color-mix(in srgb,var(--accent) 8%,transparent)}
+  .upload-trigger{background:linear-gradient(145deg,var(--surface-muted),color-mix(in srgb,var(--accent) 3%,var(--surface)))}
+  .upload-trigger.drag-active{animation:upload-ready 1.8s ease-in-out infinite}
+  @keyframes upload-ready{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--accent) 9%,transparent)}}
+  .action-button{background:linear-gradient(120deg,#527d76,#668e82);box-shadow:0 5px 16px color-mix(in srgb,var(--accent) 18%,transparent)}
+  .action-button:hover:not(:disabled){box-shadow:0 9px 22px color-mix(in srgb,var(--accent) 24%,transparent)}
+  .guide-item.ready::before{box-shadow:0 0 0 3px color-mix(in srgb,var(--green) 12%,transparent)}
+  .file-kind.template{background:color-mix(in srgb,var(--green) 14%,var(--surface));color:var(--green)}
+  .capacity-meter span{background:linear-gradient(90deg,var(--accent),var(--green))}
+  .status.success{background:color-mix(in srgb,var(--green) 7%,var(--surface))}
+  .status.error{background:color-mix(in srgb,var(--red) 7%,var(--surface))}
+  .back-link:hover,.theme-button:hover{box-shadow:0 8px 20px color-mix(in srgb,var(--accent) 12%,transparent)}
+  @media(prefers-reduced-motion:reduce){body::before,body::after{display:none}.hero:hover,.hero-facts span:hover{transform:none}}
 </style>
 </head>
 <body>
@@ -146,9 +168,9 @@
   <header class="hero">
     <div class="eyebrow">Workbook tools</div>
     <h1>Excel Compiler</h1>
-    <p>Gabungkan beberapa workbook dengan pemetaan kolom yang konsisten dan format template tetap terjaga.</p>
+    <p>Satukan beberapa file Excel atau CSV menjadi satu sheet. Kolom dicocokkan berdasarkan header agar data tetap sejajar.</p>
     <div class="hero-facts" aria-label="Batas dan kebutuhan kompilasi">
-      <span>2–20 file</span><span>Maks. 500 MB</span><span>Perlu 1 XLSX sebagai template</span>
+      <span>2–20 file</span><span>Maks. 500 MB</span><span>XLSX · XLS · CSV</span><span>Output 1 sheet</span>
     </div>
   </header>
   <section class="workspace" aria-label="Excel Compiler">
@@ -156,7 +178,7 @@
       <button class="upload-trigger" id="upload-trigger" type="button" aria-controls="source-files" aria-describedby="upload-guidance">
         <span>
           <span class="upload-icon" aria-hidden="true">＋</span>
-          <span class="upload-title">Pilih file Excel atau CSV</span>
+          <span class="upload-title">Gabungkan file Excel atau CSV</span>
           <span class="upload-detail">Klik atau tarik dan lepas · XLSX, XLS, CSV</span>
         </span>
       </button>
@@ -165,7 +187,7 @@
       <div class="empty-note" id="empty-note">Belum ada file dipilih</div>
       <div class="upload-guide" aria-label="Syarat kompilasi" aria-live="polite">
         <div class="guide-item" id="guide-files">Pilih minimal 2 file (maksimal 20).</div>
-        <div class="guide-item" id="guide-template">Sertakan setidaknya 1 file .xlsx sebagai template.</div>
+        <div class="guide-item" id="guide-headers">Header tiap file harus cocok.</div>
         <div class="guide-item" id="guide-api">Menunggu Python API siap.</div>
       </div>
       <div class="upload-footer" id="upload-guidance"><span id="file-count">0 file</span><span id="total-size">0 B</span><span>maksimal 20 file / 500 MB</span></div>
@@ -181,9 +203,9 @@
       </div>
       <div class="status" id="api-status" role="status" aria-live="polite">Memeriksa Python API...</div>
       <button class="action-button secondary" id="retry-api-button" type="button" hidden>Aktifkan ulang Python API</button>
-      <div class="status" id="status" role="status" aria-live="polite">Pilih sedikitnya 2 file dan sertakan satu XLSX sebagai template.</div>
+      <div class="status" id="status" role="status" aria-live="polite">Pilih sedikitnya 2 file Excel atau CSV untuk memulai.</div>
       <button class="action-button secondary" id="download-button" type="button" disabled><span aria-hidden="true">↓</span> Unduh hasil XLSX</button>
-      <p class="notice">Sertakan setidaknya satu file XLSX sebagai template format. CSV dan XLS diselaraskan dengan header template.</p>
+      <p class="notice">Semua file digabung menjadi satu sheet. Urutan kolom mengikuti XLSX pertama jika tersedia, atau file pertama. Format asli dipertahankan bila ada file XLSX.</p>
     </aside>
   </section>
 </main>
@@ -279,25 +301,25 @@
   function updateControls() {
     const totalBytes = selectedFiles.reduce((total, file) => total + file.size, 0);
     const hasEnoughFiles = selectedFiles.length >= 2;
-    const hasTemplate = selectedFiles.some(file => /\.xlsx$/i.test(file.name));
+    const hasXlsx = selectedFiles.some(file => /\.xlsx$/i.test(file.name));
     document.getElementById('file-count').textContent = `${selectedFiles.length} file${selectedFiles.length === 1 ? '' : 's'}`;
     document.getElementById('total-size').textContent = formatBytes(totalBytes);
     document.getElementById('empty-note').hidden = selectedFiles.length > 0;
-    compileButton.disabled = compiling || !apiReady || !hasEnoughFiles || !hasTemplate;
+    compileButton.disabled = compiling || !apiReady || !hasEnoughFiles;
     uploadTrigger.disabled = compiling;
     fileList.querySelectorAll('.remove-file').forEach(button => { button.disabled = compiling; });
     document.getElementById('upload-trigger').setAttribute('aria-label', `Tambah file, ${selectedFiles.length} dipilih`);
     const fileGuide = document.getElementById('guide-files');
-    const templateGuide = document.getElementById('guide-template');
+    const headersGuide = document.getElementById('guide-headers');
     const apiGuide = document.getElementById('guide-api');
     fileGuide.textContent = hasEnoughFiles
       ? `${selectedFiles.length} file dipilih.`
       : `Tambahkan ${2 - selectedFiles.length} file lagi (maksimal 20).`;
-    templateGuide.textContent = hasTemplate
-      ? 'Template XLSX tersedia.'
-      : 'Sertakan setidaknya 1 file .xlsx sebagai template.';
+    headersGuide.textContent = hasXlsx
+      ? 'Urutan kolom dan format mengikuti XLSX pertama.'
+      : 'Urutan kolom mengikuti file pertama; hasil dibuat satu sheet.';
     fileGuide.className = `guide-item${hasEnoughFiles ? ' ready' : selectedFiles.length ? ' current' : ''}`;
-    templateGuide.className = `guide-item${hasTemplate ? ' ready' : hasEnoughFiles ? ' current' : ''}`;
+    headersGuide.className = `guide-item${hasEnoughFiles ? ' ready' : ' current'}`;
     const apiUnavailable = apiStatusBox.classList.contains('error');
     apiGuide.className = `guide-item${apiReady ? ' ready' : apiUnavailable ? ' error' : ' current'}`;
     apiGuide.textContent = apiReady
@@ -320,7 +342,7 @@
       kind.textContent = file.name.split('.').pop().toUpperCase();
       const isTemplate = /\.xlsx$/i.test(file.name);
       kind.classList.toggle('template', isTemplate);
-      kind.title = isTemplate ? 'Bisa digunakan sebagai template format' : 'File sumber';
+      kind.title = isTemplate ? 'Mempertahankan format pada hasil' : 'File sumber';
       kind.setAttribute('aria-hidden', 'true');
       const copy = document.createElement('div');
       copy.className = 'file-copy';
@@ -406,7 +428,7 @@
   });
 
   compileButton.addEventListener('click', async () => {
-    if (compiling || !apiReady || selectedFiles.length < 2 || !selectedFiles.some(file => /\.xlsx$/i.test(file.name))) return;
+    if (compiling || !apiReady || selectedFiles.length < 2) return;
     compiling = true;
     clearOutput();
     loading.classList.add('show');
