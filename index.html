@@ -784,6 +784,76 @@ async function cmdbServerFetch(path, options = {}) {
   }
   return response;
 }
+async function cmdbStagingFetch(path, options = {}) {
+  const response = await fetch(path, options);
+  const text = await response.text();
+  let result;
+  try {
+    result = JSON.parse(text);
+  } catch (error) {
+    throw new Error(`Respons staging PostgreSQL tidak valid (${response.status})`);
+  }
+  if (!response.ok) throw new Error(result.error || `Server staging merespons ${response.status}`);
+  return result;
+}
+async function stageCMDBChunksInPostgres(onSessionCreated) {
+  let status;
+  try {
+    status = await cmdbStagingFetch('/api/cmdb/staging');
+  } catch (error) {
+    log(`⚠️ PostgreSQL staging tidak tersedia; kompilasi berjalan tanpa staging: ${error.message}`);
+    return null;
+  }
+  if (!status.enabled) {
+    log('⚠️ PostgreSQL staging belum dikonfigurasi; kompilasi berjalan tanpa staging.');
+    return null;
+  }
+
+  const session = await cmdbStagingFetch('/api/cmdb/staging', {method: 'POST'});
+  const sessionId = session.session_id;
+  if (typeof sessionId !== 'string' || !/^[0-9a-f-]{36}$/i.test(sessionId)) {
+    throw new Error('API staging tidak memberikan ID sesi yang valid');
+  }
+  onSessionCreated(sessionId);
+  log(`🗄️ Menyimpan ${CMDB_CACHE.meta.sites.toLocaleString('id-ID')} site ke PostgreSQL sementara...`);
+
+  const pending = [];
+  let batch = [], batchBytes = 2, chunkIndex = 0;
+  const maxBatchBytes = 4 * 1024 * 1024;
+  async function flushBatch() {
+    if (!batch.length) return;
+    const rows = batch;
+    const index = chunkIndex++;
+    batch = [];
+    batchBytes = 2;
+    pending.push(cmdbStagingFetch(`/api/cmdb/staging/${sessionId}/chunks`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({chunk_index: index, rows})
+    }));
+    if (pending.length >= 3) await pending.shift();
+  }
+
+  try {
+    for (const chunk of CMDB_CACHE.chunks) {
+      for (const [siteId, values] of chunk) {
+        const row = [siteId, values];
+        const rowBytes = new TextEncoder().encode(JSON.stringify(row)).length + 1;
+        if (rowBytes + 2 > maxBatchBytes) throw new Error(`Baris CMDB ${siteId} melebihi batas ukuran staging`);
+        if (batch.length >= 500 || batchBytes + rowBytes > maxBatchBytes) await flushBatch();
+        batch.push(row);
+        batchBytes += rowBytes;
+      }
+    }
+    await flushBatch();
+    await Promise.all(pending);
+  } catch (error) {
+    await Promise.allSettled(pending);
+    throw error;
+  }
+  log(`✅ PostgreSQL staging selesai: ${chunkIndex} chunk.`);
+  return sessionId;
+}
 async function refreshCMDBServerStatus() {
   const status = document.getElementById('cmdb-server-status');
   status.textContent = 'Memeriksa database CMDB server...';
@@ -1754,6 +1824,7 @@ async function process() {
   document.getElementById('progress-card').classList.add('show');
   resetStages();
   const t0 = performance.now();
+  let stagingSessionId = null;
 
   try {
     if (!window.XLSX) throw new Error('Library Excel tidak tersedia');
@@ -1910,6 +1981,9 @@ async function process() {
       cmdbRowsRaw = null;
       updateCMDBBadge();
     }
+    stagingSessionId = await stageCMDBChunksInPostgres(sessionId => {
+      stagingSessionId = sessionId;
+    });
 
     const statusByRow = [];
     let downCount = 0;
@@ -2361,6 +2435,16 @@ async function process() {
     if (active) failStage(active.id, err.message);
     toast('❌ ' + err.message, 'error');
   } finally {
+    if (stagingSessionId) {
+      try {
+        await cmdbStagingFetch(`/api/cmdb/staging/${stagingSessionId}`, {method: 'DELETE'});
+        log('🧹 Data staging PostgreSQL dihapus setelah proses kompilasi.');
+      } catch (error) {
+        console.error('PostgreSQL staging cleanup failed:', error);
+        log(`⚠️ Data staging PostgreSQL belum terhapus dan akan kedaluwarsa otomatis: ${error.message}`);
+        toast('⚠️ Pembersihan staging PostgreSQL gagal; data akan dibersihkan setelah masa retensi.', 'error');
+      }
+    }
     btn.classList.remove('loading');
     btn.textContent = '🚀 Proses Kompilasi';
     processing = false;

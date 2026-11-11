@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
 import json
 import logging
+import math
 import os
 import re
 import sqlite3
 import tempfile
+import threading
+import time
+import uuid
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote
 
+import psycopg
+from psycopg.types.json import Jsonb
 from python_multipart.exceptions import MultipartParseError
 from python_multipart.multipart import File as MultipartFile
 from python_multipart.multipart import MultipartParser, parse_options_header
@@ -18,8 +24,12 @@ from excel_compiler import MAX_FILES, MAX_UPLOAD_BYTES as MAX_EXCEL_UPLOAD_BYTES
 
 MAX_EXCEL_REQUEST_BYTES = MAX_EXCEL_UPLOAD_BYTES + 2 * 1024 * 1024
 MAX_CMDB_UPLOAD_BYTES = 100 * 1024 * 1024
+MAX_STAGING_CHUNK_BYTES = 8 * 1024 * 1024
+MAX_STAGING_CHUNK_ROWS = 5000
+MAX_STAGING_SESSION_BYTES = 256 * 1024 * 1024
 CMDB_ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".csv"}
 LEGACY_GENERATION_PATTERN = re.compile(r"^[a-f0-9]{32}\.bin$")
+STAGING_UUID_PATTERN = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 
 
 def safe_cmdb_filename(value):
@@ -53,6 +63,81 @@ def initialize_cmdb_database(database_path):
         migrate_legacy_cmdb(connection, path.parent)
     finally:
         connection.close()
+
+
+def initialize_staging_database(database_url):
+    with psycopg.connect(database_url, connect_timeout=10) as connection:
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS cmdb_staging_sessions (
+                session_id UUID PRIMARY KEY,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                expires_at TIMESTAMPTZ NOT NULL,
+                staging_bytes BIGINT NOT NULL DEFAULT 0 CHECK (staging_bytes >= 0)
+            )
+        """)
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS cmdb_staging_chunks (
+                session_id UUID NOT NULL REFERENCES cmdb_staging_sessions(session_id) ON DELETE CASCADE,
+                chunk_index INTEGER NOT NULL CHECK (chunk_index >= 0),
+                rows JSONB NOT NULL,
+                row_count INTEGER NOT NULL CHECK (row_count > 0),
+                payload_bytes INTEGER NOT NULL CHECK (payload_bytes > 0),
+                PRIMARY KEY (session_id, chunk_index)
+            )
+        """)
+        connection.execute(
+            "ALTER TABLE cmdb_staging_sessions ADD COLUMN IF NOT EXISTS "
+            "staging_bytes BIGINT NOT NULL DEFAULT 0"
+        )
+        connection.execute(
+            "ALTER TABLE cmdb_staging_chunks ADD COLUMN IF NOT EXISTS "
+            "payload_bytes INTEGER NOT NULL DEFAULT 1"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS cmdb_staging_sessions_expires_at "
+            "ON cmdb_staging_sessions (expires_at)"
+        )
+        connection.execute(
+            "DELETE FROM cmdb_staging_sessions WHERE expires_at <= now()"
+        )
+
+
+def start_staging_cleanup_worker(database_url, interval_seconds=900):
+    def cleanup_loop():
+        while True:
+            time.sleep(interval_seconds)
+            try:
+                with psycopg.connect(database_url, connect_timeout=10) as connection:
+                    result = connection.execute(
+                        "DELETE FROM cmdb_staging_sessions WHERE expires_at <= now()"
+                    )
+                if result.rowcount:
+                    logging.info("Removed %s expired PostgreSQL staging sessions", result.rowcount)
+            except psycopg.Error:
+                logging.exception("Expired PostgreSQL staging cleanup failed")
+
+    threading.Thread(target=cleanup_loop, name="cmdb-staging-cleanup", daemon=True).start()
+
+
+def parse_staging_rows(value):
+    if not isinstance(value, list) or not 1 <= len(value) <= MAX_STAGING_CHUNK_ROWS:
+        raise ValueError(f"Chunk harus berisi 1 sampai {MAX_STAGING_CHUNK_ROWS} baris")
+    for entry in value:
+        if (
+            not isinstance(entry, list)
+            or len(entry) != 2
+            or not isinstance(entry[0], str)
+            or not entry[0]
+            or len(entry[0]) > 256
+            or not isinstance(entry[1], list)
+        ):
+            raise ValueError("Format baris CMDB staging tidak valid")
+        for cell in entry[1]:
+            if cell is not None and not isinstance(cell, (str, int, float, bool)):
+                raise ValueError("Nilai kolom CMDB staging harus berupa nilai sederhana")
+            if isinstance(cell, float) and not math.isfinite(cell):
+                raise ValueError("Nilai numerik CMDB staging tidak valid")
+    return value
 
 
 def migrate_legacy_cmdb(connection, data_dir):
@@ -101,8 +186,10 @@ def migrate_legacy_cmdb(connection, data_dir):
     logging.getLogger(__name__).info("Migrated saved CMDB file into SQLite")
 
 
-def make_handler(database_path):
+def make_handler(database_path, staging_database_url=None, staging_ttl_seconds=86400):
     initialize_cmdb_database(database_path)
+    if staging_database_url:
+        initialize_staging_database(staging_database_url)
     database_path = Path(database_path)
 
     class ExcelAPIHandler(BaseHTTPRequestHandler):
@@ -127,6 +214,15 @@ def make_handler(database_path):
             if self.path == "/api/cmdb/save":
                 self.store_cmdb("save")
                 return
+            if self.path == "/api/cmdb/staging":
+                self.create_staging_session()
+                return
+            staging_match = re.fullmatch(
+                rf"/api/cmdb/staging/({STAGING_UUID_PATTERN})/chunks", self.path
+            )
+            if staging_match:
+                self.store_staging_chunk(staging_match.group(1))
+                return
             self.send_json(404, {"error": "Endpoint tidak ditemukan"})
 
         def do_GET(self):
@@ -139,6 +235,9 @@ def make_handler(database_path):
             if self.path == "/api/cmdb/file":
                 self.download_cmdb()
                 return
+            if self.path == "/api/cmdb/staging":
+                self.get_staging_status()
+                return
             self.send_json(404, {"error": "Endpoint tidak ditemukan"})
 
         def do_PUT(self):
@@ -146,6 +245,142 @@ def make_handler(database_path):
                 self.store_cmdb("update")
                 return
             self.send_json(404, {"error": "Endpoint tidak ditemukan"})
+
+        def do_DELETE(self):
+            staging_match = re.fullmatch(
+                rf"/api/cmdb/staging/({STAGING_UUID_PATTERN})", self.path
+            )
+            if staging_match:
+                self.delete_staging_session(staging_match.group(1))
+                return
+            self.send_json(404, {"error": "Endpoint tidak ditemukan"})
+
+        def get_staging_status(self):
+            self.send_json(200, {
+                "enabled": bool(staging_database_url),
+                "retention_seconds": staging_ttl_seconds,
+            })
+
+        def create_staging_session(self):
+            if not staging_database_url:
+                self.send_json(503, {"error": "PostgreSQL staging belum dikonfigurasi"})
+                return
+            session_id = uuid.uuid4()
+            try:
+                with psycopg.connect(staging_database_url, connect_timeout=10) as connection:
+                    connection.execute(
+                        "DELETE FROM cmdb_staging_sessions WHERE expires_at <= now()"
+                    )
+                    connection.execute(
+                        "INSERT INTO cmdb_staging_sessions (session_id, expires_at) "
+                        "VALUES (%s, now() + (%s * interval '1 second'))",
+                        (session_id, staging_ttl_seconds),
+                    )
+                self.send_json(201, {
+                    "session_id": str(session_id),
+                    "retention_seconds": staging_ttl_seconds,
+                })
+            except psycopg.Error as error:
+                self.log_error("PostgreSQL staging session creation failed: %s", error)
+                self.send_json(500, {"error": "Gagal membuat sesi staging PostgreSQL"})
+
+        def read_staging_json(self):
+            if self.headers.get_content_type() != "application/json":
+                raise ValueError("Content-Type harus application/json")
+            try:
+                content_length = int(self.headers.get("Content-Length", "0"))
+            except (TypeError, ValueError) as error:
+                raise ValueError("Ukuran request staging tidak valid") from error
+            if content_length <= 0 or content_length > MAX_STAGING_CHUNK_BYTES:
+                raise OverflowError("Ukuran chunk PostgreSQL melebihi batas 8 MiB")
+            body = self.rfile.read(content_length)
+            if len(body) != content_length:
+                raise ValueError("Upload chunk terputus sebelum selesai")
+            try:
+                return json.loads(body), content_length
+            except (UnicodeDecodeError, ValueError) as error:
+                raise ValueError("JSON chunk staging tidak valid") from error
+
+        def store_staging_chunk(self, session_id):
+            if not staging_database_url:
+                self.send_json(503, {"error": "PostgreSQL staging belum dikonfigurasi"})
+                return
+            try:
+                payload, payload_bytes = self.read_staging_json()
+                if not isinstance(payload, dict):
+                    raise ValueError("Payload chunk staging tidak valid")
+                chunk_index = payload.get("chunk_index")
+                if (
+                    not isinstance(chunk_index, int)
+                    or isinstance(chunk_index, bool)
+                    or chunk_index < 0
+                    or chunk_index > 2_147_483_647
+                ):
+                    raise ValueError("Nomor chunk staging tidak valid")
+                rows = parse_staging_rows(payload.get("rows"))
+            except OverflowError as error:
+                self.send_json(413, {"error": str(error)})
+                return
+            except ValueError as error:
+                self.send_json(400, {"error": str(error)})
+                return
+
+            try:
+                session_uuid = uuid.UUID(session_id)
+                with psycopg.connect(staging_database_url, connect_timeout=10) as connection:
+                    active_session = connection.execute(
+                        "SELECT staging_bytes FROM cmdb_staging_sessions "
+                        "WHERE session_id = %s AND expires_at > now() FOR UPDATE",
+                        (session_uuid,),
+                    ).fetchone()
+                    if active_session is None:
+                        self.send_json(404, {"error": "Sesi staging tidak ditemukan atau kedaluwarsa"})
+                        return
+                    existing_chunk = connection.execute(
+                        "SELECT payload_bytes FROM cmdb_staging_chunks "
+                        "WHERE session_id = %s AND chunk_index = %s",
+                        (session_uuid, chunk_index),
+                    ).fetchone()
+                    updated_size = active_session[0] - (existing_chunk[0] if existing_chunk else 0) + payload_bytes
+                    if updated_size > MAX_STAGING_SESSION_BYTES:
+                        self.send_json(413, {"error": "Sesi staging melebihi batas total 256 MiB"})
+                        return
+                    connection.execute(
+                        "INSERT INTO cmdb_staging_chunks "
+                        "(session_id, chunk_index, rows, row_count, payload_bytes) "
+                        "VALUES (%s, %s, %s, %s, %s) "
+                        "ON CONFLICT (session_id, chunk_index) DO UPDATE "
+                        "SET rows = EXCLUDED.rows, row_count = EXCLUDED.row_count, "
+                        "payload_bytes = EXCLUDED.payload_bytes",
+                        (session_uuid, chunk_index, Jsonb(rows), len(rows), payload_bytes),
+                    )
+                    connection.execute(
+                        "UPDATE cmdb_staging_sessions SET staging_bytes = %s WHERE session_id = %s",
+                        (updated_size, session_uuid),
+                    )
+                self.send_json(201, {
+                    "chunk_index": chunk_index,
+                    "row_count": len(rows),
+                })
+            except (ValueError, psycopg.Error) as error:
+                self.log_error("PostgreSQL staging chunk failed: %s", error)
+                self.send_json(500, {"error": "Gagal menyimpan chunk ke PostgreSQL"})
+
+        def delete_staging_session(self, session_id):
+            if not staging_database_url:
+                self.send_json(503, {"error": "PostgreSQL staging belum dikonfigurasi"})
+                return
+            try:
+                session_uuid = uuid.UUID(session_id)
+                with psycopg.connect(staging_database_url, connect_timeout=10) as connection:
+                    connection.execute(
+                        "DELETE FROM cmdb_staging_sessions WHERE session_id = %s",
+                        (session_uuid,),
+                    )
+                self.send_json(200, {"deleted": True})
+            except (ValueError, psycopg.Error) as error:
+                self.log_error("PostgreSQL staging cleanup failed: %s", error)
+                self.send_json(500, {"error": "Gagal menghapus sesi staging PostgreSQL"})
 
         def get_health(self):
             connection = None
@@ -432,7 +667,19 @@ def make_handler(database_path):
 def main():
     database_path = os.environ.get("CMDB_DATABASE_PATH", "/data/cmdb.sqlite3")
     port = int(os.environ.get("PORT", "8000"))
-    server = ThreadingHTTPServer(("0.0.0.0", port), make_handler(database_path))
+    staging_database_url = os.environ.get("DATABASE_URL")
+    try:
+        staging_ttl_seconds = int(os.environ.get("CMDB_STAGING_TTL_SECONDS", "86400"))
+    except ValueError as error:
+        raise RuntimeError("CMDB_STAGING_TTL_SECONDS harus berupa bilangan bulat") from error
+    if not 60 <= staging_ttl_seconds <= 30 * 24 * 60 * 60:
+        raise RuntimeError("CMDB_STAGING_TTL_SECONDS harus antara 60 dan 2592000")
+    server = ThreadingHTTPServer(
+        ("0.0.0.0", port),
+        make_handler(database_path, staging_database_url, staging_ttl_seconds),
+    )
+    if staging_database_url:
+        start_staging_cleanup_worker(staging_database_url)
     server.serve_forever()
 
 

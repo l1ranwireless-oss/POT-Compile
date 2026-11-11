@@ -11,7 +11,7 @@ from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
 
-from excel_server import initialize_cmdb_database, make_handler
+from excel_server import initialize_cmdb_database, make_handler, parse_staging_rows
 
 
 def workbook_bytes(rows):
@@ -66,6 +66,31 @@ class ExcelServerTests(unittest.TestCase):
         with urlopen(self.base_url + "/api/health") as response:
             self.assertEqual(response.status, 200)
             self.assertEqual(json.loads(response.read()), {"status": "ok"})
+
+    def test_postgres_staging_reports_disabled_without_database_url(self):
+        with urlopen(self.base_url + "/api/cmdb/staging") as response:
+            self.assertEqual(json.loads(response.read()), {
+                "enabled": False,
+                "retention_seconds": 86400,
+            })
+
+    def test_postgres_staging_creation_requires_database_url(self):
+        request = Request(self.base_url + "/api/cmdb/staging", data=b"", method="POST")
+        with self.assertRaises(HTTPError) as raised:
+            urlopen(request)
+        self.assertEqual(raised.exception.code, 503)
+        self.assertEqual(
+            json.loads(raised.exception.read()),
+            {"error": "PostgreSQL staging belum dikonfigurasi"},
+        )
+        raised.exception.close()
+
+    def test_postgres_staging_rows_validate_shape_and_cell_types(self):
+        rows = [["SITE-1", ["Name", 1, None, True]]]
+        self.assertEqual(parse_staging_rows(rows), rows)
+        for invalid_rows in ([], [["", ["value"]]], [["SITE-1", [{"nested": "value"}]]]):
+            with self.subTest(rows=invalid_rows), self.assertRaises(ValueError):
+                parse_staging_rows(invalid_rows)
 
     def test_cmdb_database_migrates_existing_server_file(self):
         content = b"Existing server CMDB"

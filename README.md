@@ -22,13 +22,15 @@ Fitur ini menggunakan Python API terbuka pada deployment Docker. Saat halaman Ex
 
 API membuat tabel SQLite `cmdb_files` secara otomatis saat pertama kali dijalankan dan menyimpan satu file sumber CMDB pada named volume Docker `cmdb_data`. File CMDB yang telah tersimpan pada format server sebelumnya akan dimigrasikan ke SQLite saat startup. Tidak diperlukan service atau proses database terpisah. Gunakan **Simpan CMDB** untuk penyimpanan pertama, **Update Server** untuk mengganti file, dan **Muat Server** untuk memulihkan salinan server. Cache browser di IndexedDB tetap tersedia untuk pemulihan lokal.
 
+Setelah CMDB di-chunk untuk kompilasi, API dapat menyimpan cache site sementara pada PostgreSQL. Fitur ini opsional untuk deployment lokal dan otomatis aktif bila `DATABASE_URL` tersedia. API membuat tabel `cmdb_staging_sessions` dan `cmdb_staging_chunks` saat startup; tiap sesi dibatasi 256 MiB. Data sesi dihapus setelah proses kompilasi berhasil maupun gagal; jika proses terputus, sesi kedaluwarsa setelah 24 jam secara default dan dibersihkan setiap 15 menit. Atur `CMDB_STAGING_TTL_SECONDS` ke nilai 60–2592000 untuk mengubah masa kedaluwarsa. Penyimpanan staging bukan pengganti cache kompilasi browser atau SQLite untuk file CMDB.
+
 Jalankan `sh deploy.sh` untuk memulai layanan. Layanan web di-bind ke `127.0.0.1` secara default dan port dapat diubah, misalnya `PORT=9000 sh deploy.sh`. Endpoint API tidak memiliki autentikasi, jadi jangan paparkan ke jaringan publik tanpa proteksi akses pada reverse proxy. Untuk akses jaringan, gunakan HTTPS dan batasi akses ke pengguna/jaringan yang berwenang. GitHub Pages bersifat statis dan tidak menyediakan API kompilasi atau penyimpanan CMDB.
 
 ## Deploy dan auto-wake di Railway
 
 Railway tidak menjalankan `sh deploy.sh` dari browser. Sebagai gantinya, deploy web dan API sebagai dua service dari repository yang sama:
 
-1. Buat service API dengan Dockerfile `Dockerfile.api`. Tambahkan volume persisten pada mount path `/data`, lalu atur `CMDB_DATABASE_PATH=/data/cmdb.sqlite3`, `PORT=8000`, dan `RAILWAY_RUN_UID=0` agar proses dapat menulis ke volume Railway.
+1. Buat service PostgreSQL dan service API dengan Dockerfile `Dockerfile.api`. Tambahkan volume persisten pada API di mount path `/data`, lalu atur `CMDB_DATABASE_PATH=/data/cmdb.sqlite3`, `PORT=8000`, `RAILWAY_RUN_UID=0`, dan `DATABASE_URL` sebagai reference ke URL koneksi PostgreSQL (contoh Railway: `${{Postgres.DATABASE_URL}}`, sesuaikan nama service PostgreSQL). API akan membuat tabel staging otomatis; jangan menempelkan URL atau kredensial database ke source code.
 2. Pada service API, aktifkan **Serverless** di pengaturan deploy Railway dan atur healthcheck path ke `/api/health`. Gunakan satu replica untuk service API yang memakai volume SQLite; volume mempertahankan database ketika service tidur.
 3. Buat service web dengan Dockerfile `Dockerfile`. Tambahkan public domain untuk service ini, atur target `PORT=80`, lalu atur `API_HOST` ke private domain API, misalnya `excel-api.railway.internal`, dan `API_PORT=8000`.
 4. Pastikan kedua service berada di project dan environment Railway yang sama. Nginx meneruskan `/api/` melalui private network; membuka menu **Excel Compiler** memanggil healthcheck yang membangunkan API bila sedang tidur.
