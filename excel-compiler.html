@@ -59,6 +59,7 @@
   .file-item{display:flex;align-items:center;gap:10px;min-width:0;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface-muted);animation:file-pop .24s ease-out both}
   @keyframes file-pop{from{opacity:0;transform:translateY(7px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
   .file-kind{display:grid;place-items:center;width:30px;height:34px;flex:0 0 30px;border-radius:5px;background:rgba(84,134,147,.1);color:var(--accent);font:700 9px monospace}
+  .file-kind.template{background:color-mix(in srgb,var(--green) 14%,var(--surface));color:var(--green)}
   .file-copy{min-width:0;flex:1}
   .file-name{overflow:hidden;color:var(--text);font-size:12px;font-weight:650;text-overflow:ellipsis;white-space:nowrap}
   .file-size{color:var(--faint);font-size:10px}
@@ -98,6 +99,41 @@
   @keyframes rise-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
   @media(max-width:720px){body{padding:18px}.topbar{margin-bottom:30px}.workspace{grid-template-columns:1fr;gap:14px}.actions{order:2}.upload-area{padding:18px}.hero{padding:25px 22px}h1{font-size:30px}}
   @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+  .shell{width:min(100%,1080px)}
+  .topbar{margin-bottom:28px}
+  .hero{margin-bottom:18px;padding:clamp(24px,4vw,36px)}
+  .hero p{max-width:660px}
+  .hero-facts span{font-size:11px}
+  .workspace{grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr);gap:16px}
+  .upload-area,.actions{border-radius:18px}
+  .upload-area{min-height:0;padding:22px}
+  .upload-trigger{min-height:170px;border-radius:16px}
+  .upload-trigger:hover{transform:translateY(-2px)}
+  .upload-guide{display:grid;gap:8px;margin-top:16px}
+  .guide-item{display:flex;align-items:center;gap:9px;color:var(--faint);font-size:11px;transition:color .2s ease}
+  .guide-item::before{display:grid;place-items:center;width:20px;height:20px;flex:0 0 20px;border:1px solid var(--border);border-radius:50%;content:"";font-size:11px;font-weight:800;transition:background .2s,border-color .2s,color .2s}
+  .guide-item.ready{color:var(--green)}
+  .guide-item.ready::before{border-color:var(--green);background:var(--green);color:var(--surface);content:"✓"}
+  .guide-item.current{color:var(--accent)}
+  .guide-item.current::before{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 12%,transparent)}
+  .guide-item.error{color:var(--red)}
+  .guide-item.error::before{border-color:var(--red);background:var(--red);color:var(--surface);content:"!"}
+  .upload-footer{padding-top:12px;border-top:1px solid var(--border);font-family:"Inter","Segoe UI",sans-serif;font-size:10px}
+  .capacity-meter{height:5px;margin-top:8px;overflow:hidden;border-radius:99px;background:var(--border)}
+  .capacity-meter span{display:block;width:0;height:100%;border-radius:inherit;background:var(--accent);transition:width .35s ease,background .2s ease}
+  .capacity-meter.near-limit span{background:var(--red)}
+  .actions{position:sticky;top:18px;gap:14px;padding:20px}
+  .action-button{min-height:48px}
+  .action-button:not(:disabled){box-shadow:0 5px 14px color-mix(in srgb,var(--accent) 12%,transparent)}
+  .status{border-radius:10px;line-height:1.55}
+  .notice{margin:0;padding:12px;border-radius:10px;background:var(--surface-muted)}
+  .file-item{padding:11px 12px;border-radius:11px;transition:border-color .2s,transform .2s}
+  .file-item:hover{transform:translateX(2px);border-color:color-mix(in srgb,var(--accent) 38%,var(--border))}
+  .remove-file{transition:background .18s,color .18s}
+  :where(button,a):focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+  @media(max-width:720px){.topbar{margin-bottom:22px}.actions{position:static}.workspace{gap:12px}.upload-guide{margin-top:14px}}
+  @media(max-width:420px){body{padding:14px}.topbar{gap:8px}.back-link,.theme-button{padding:9px 11px;font-size:12px}.hero{padding:22px 18px}.upload-area{padding:16px}.upload-footer{flex-wrap:wrap}}
+  @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
 </head>
 <body>
@@ -127,7 +163,13 @@
       <input class="file-input" id="file-input" type="file" accept=".xlsx,.xls,.csv" multiple>
       <ul class="file-list" id="source-files" aria-label="File yang dipilih"></ul>
       <div class="empty-note" id="empty-note">Belum ada file dipilih</div>
+      <div class="upload-guide" aria-label="Syarat kompilasi" aria-live="polite">
+        <div class="guide-item" id="guide-files">Pilih minimal 2 file (maksimal 20).</div>
+        <div class="guide-item" id="guide-template">Sertakan setidaknya 1 file .xlsx sebagai template.</div>
+        <div class="guide-item" id="guide-api">Menunggu Python API siap.</div>
+      </div>
       <div class="upload-footer" id="upload-guidance"><span id="file-count">0 file</span><span id="total-size">0 B</span><span>maksimal 20 file / 500 MB</span></div>
+      <div class="capacity-meter" id="capacity-meter" role="progressbar" aria-label="Penggunaan batas ukuran upload" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="capacity-fill"></span></div>
     </div>
     <aside class="actions" aria-label="Proses dan hasil">
       <button class="action-button" id="compile-button" type="button" disabled><span aria-hidden="true">⟳</span> Gabungkan file</button>
@@ -139,7 +181,7 @@
       </div>
       <div class="status" id="api-status" role="status" aria-live="polite">Memeriksa Python API...</div>
       <button class="action-button secondary" id="retry-api-button" type="button" hidden>Aktifkan ulang Python API</button>
-      <div class="status" id="status" role="status" aria-live="polite">Pilih sedikitnya 2 file untuk memulai.</div>
+      <div class="status" id="status" role="status" aria-live="polite">Pilih sedikitnya 2 file dan sertakan satu XLSX sebagai template.</div>
       <button class="action-button secondary" id="download-button" type="button" disabled><span aria-hidden="true">↓</span> Unduh hasil XLSX</button>
       <p class="notice">Sertakan setidaknya satu file XLSX sebagai template format. CSV dan XLS diselaraskan dengan header template.</p>
     </aside>
@@ -234,13 +276,36 @@
 
   function updateControls() {
     const totalBytes = selectedFiles.reduce((total, file) => total + file.size, 0);
+    const hasEnoughFiles = selectedFiles.length >= 2;
+    const hasTemplate = selectedFiles.some(file => /\.xlsx$/i.test(file.name));
     document.getElementById('file-count').textContent = `${selectedFiles.length} file${selectedFiles.length === 1 ? '' : 's'}`;
     document.getElementById('total-size').textContent = formatBytes(totalBytes);
     document.getElementById('empty-note').hidden = selectedFiles.length > 0;
-    compileButton.disabled = compiling || !apiReady || selectedFiles.length < 2;
+    compileButton.disabled = compiling || !apiReady || !hasEnoughFiles || !hasTemplate;
     uploadTrigger.disabled = compiling;
     fileList.querySelectorAll('.remove-file').forEach(button => { button.disabled = compiling; });
     document.getElementById('upload-trigger').setAttribute('aria-label', `Tambah file, ${selectedFiles.length} dipilih`);
+    const fileGuide = document.getElementById('guide-files');
+    const templateGuide = document.getElementById('guide-template');
+    const apiGuide = document.getElementById('guide-api');
+    fileGuide.textContent = hasEnoughFiles
+      ? `${selectedFiles.length} file dipilih.`
+      : `Tambahkan ${2 - selectedFiles.length} file lagi (maksimal 20).`;
+    templateGuide.textContent = hasTemplate
+      ? 'Template XLSX tersedia.'
+      : 'Sertakan setidaknya 1 file .xlsx sebagai template.';
+    fileGuide.className = `guide-item${hasEnoughFiles ? ' ready' : selectedFiles.length ? ' current' : ''}`;
+    templateGuide.className = `guide-item${hasTemplate ? ' ready' : hasEnoughFiles ? ' current' : ''}`;
+    const apiUnavailable = apiStatusBox.classList.contains('error');
+    apiGuide.className = `guide-item${apiReady ? ' ready' : apiUnavailable ? ' error' : ' current'}`;
+    apiGuide.textContent = apiReady
+      ? 'Python API siap digunakan.'
+      : apiUnavailable ? 'API belum tersedia. Periksa panel proses.' : 'Menunggu Python API siap.';
+    const capacityMeter = document.getElementById('capacity-meter');
+    const capacityPercent = Math.min(100, Math.round(totalBytes / MAX_BYTES * 100));
+    capacityMeter.setAttribute('aria-valuenow', String(capacityPercent));
+    capacityMeter.classList.toggle('near-limit', capacityPercent >= 85);
+    document.getElementById('capacity-fill').style.width = `${capacityPercent}%`;
   }
 
   function renderFiles() {
@@ -251,6 +316,9 @@
       const kind = document.createElement('span');
       kind.className = 'file-kind';
       kind.textContent = file.name.split('.').pop().toUpperCase();
+      const isTemplate = /\.xlsx$/i.test(file.name);
+      kind.classList.toggle('template', isTemplate);
+      kind.title = isTemplate ? 'Bisa digunakan sebagai template format' : 'File sumber';
       kind.setAttribute('aria-hidden', 'true');
       const copy = document.createElement('div');
       copy.className = 'file-copy';
@@ -336,7 +404,7 @@
   });
 
   compileButton.addEventListener('click', async () => {
-    if (compiling || !apiReady || selectedFiles.length < 2) return;
+    if (compiling || !apiReady || selectedFiles.length < 2 || !selectedFiles.some(file => /\.xlsx$/i.test(file.name))) return;
     compiling = true;
     clearOutput();
     loading.classList.add('show');
