@@ -77,7 +77,7 @@
   @keyframes titleGlow{0%,100%{filter:drop-shadow(0 0 20px rgba(0,217,255,0.5))}50%{filter:drop-shadow(0 0 30px rgba(177,74,255,0.7))}}
   .header p{color:var(--text-secondary);font-size:13px;font-weight:500}
   .header p b{color:var(--text-primary)}
-  .upload-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px}
+  .upload-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px}
   @media(max-width:1100px){.upload-grid{grid-template-columns:repeat(2,1fr)}}
   @media(max-width:600px){.upload-grid{grid-template-columns:1fr}}
   .upload-card{background:var(--bg-card);backdrop-filter:blur(20px);border-radius:16px;padding:20px;box-shadow:var(--shadow-card);border:1px solid var(--border-subtle);border-top:3px solid;transition:all .4s;position:relative;overflow:hidden;animation:cardIn .7s ease-out backwards}
@@ -345,6 +345,7 @@
 <div class="container" id="main-app" tabindex="-1">
   <div class="header">
     <h1>Compiler Data POT</h1>
+    <p>Gunakan file <b>POT + CMDB</b>; sheet segmentation akan dibuat otomatis.</p>
     <p><b>Hanya Sekedar Aplikasi</b> · <b>Jangan Lupa Ibadah</b> 
   </div>
 
@@ -365,23 +366,6 @@
         <div class="name" id="name-pot"></div>
         <div class="meta" id="meta-pot"></div>
         <div class="warn-tag" id="warn-pot"></div>
-      </div>
-    </div>
-
-    <div class="upload-card seg">
-      <h2>🔵 Segmentation <span class="badge blue">WAJIB</span></h2>
-      <div class="desc">Data actual · site absen = UP</div>
-      <label class="drop-zone" id="dz-seg">
-        <input type="file" id="file-seg" accept=".xlsx,.xls,.csv">
-        <div class="icon">📘</div>
-        <div class="label">Klik / seret</div>
-        <div class="sub">.xlsx · .xls · .csv</div>
-      </label>
-      <div class="file-info" id="info-seg">
-        <span class="remove" onclick="clearFile('seg');event.preventDefault()">✕</span>
-        <div class="name" id="name-seg"></div>
-        <div class="meta" id="meta-seg"></div>
-        <div class="warn-tag" id="warn-seg"></div>
       </div>
     </div>
 
@@ -448,7 +432,7 @@
     <div class="progress-bar"><div class="progress-bar-fill" id="progress-fill"></div></div>
     <div class="stages">
       <div class="stage" id="stage-pot"><div class="indicator">1</div><div class="text">Membaca POT</div><div class="detail" id="det-pot"></div></div>
-      <div class="stage" id="stage-seg"><div class="indicator">2</div><div class="text">Membaca Segmentation + CMDB Site</div><div class="detail" id="det-seg"></div></div>
+      <div class="stage" id="stage-source"><div class="indicator">2</div><div class="text">Membaca header POT + CMDB Site</div><div class="detail" id="det-source"></div></div>
       <div class="stage" id="stage-zip"><div class="indicator">3</div><div class="text">Membaca ZIP Power Alarm</div><div class="detail" id="det-zip"></div></div>
       <div class="stage" id="stage-base"><div class="indicator">4</div><div class="text">Chunking CMDB Site + Base SDL</div><div class="detail" id="det-base"></div></div>
       <div class="stage" id="stage-build"><div class="indicator">5</div><div class="text">Membangun Segmentation</div><div class="detail" id="det-build"></div></div>
@@ -572,12 +556,14 @@ const CMDB_HEADER_DETECTION_COLS = ['Site Id','Site Name*','HUB Type','Site Prio
 const CMDB_CRITICAL_COLS = ['Site Id', 'MC Cluster', 'HUB Type', 'Site Priority Label'];
 
 const COL_ALIASES = {
-  'Key': ['Key'],
-  'First Occurred(NT)': ['First Occurrence','First Occurred','FirstOccurred'],
-  'Last Occurred(NT)':  ['Last Occurrence','Last Occurred','LastOccurred'],
-  'Site Id': ['Site ID','SiteID','Site_Id','SITEID','Site ID*','Site Id*','Site','SiteCode','Site Code'],
+  'Key': ['Key','Snapshot Key','Grouping Key'],
+  'First Occurred(NT)': ['First Occurred(NT)','First Occurrence','First Occurred','FirstOccurred'],
+  'Last Occurred(NT)':  ['Last Occurred(NT)','Last Occurrence','Last Occurred','LastOccurred'],
+  'Status': ['Status','Current Status Site (Up/Down)','Current Status','Site Status'],
+  'Site Id': ['Site ID','SiteID','Site_Id','SITEID','Site ID*','Site Id*','SiteCode','Site Code'],
   'Site Name': ['Site Name','SiteName','Site Name*','Site_Name','BTS Name','BTSName','Name'],
   'Site Name*': ['Site Name*','Site Name','SiteName','Site_Name','BTS Name','BTSName','Name'],
+  'BTS Name': ['BTS Name','BTSName','Site Name','SiteName','Site Name*','Site_Name'],
   'MC Cluster': ['MC Cluster','MC Area','MCArea','MC Cluster Name','MCCluster','MC_Cluster','Cluster','Cluster Name','MCClusterName'],
   'HUB Type': ['HUB Type','Hub Type','HubType','Hub_Type','HubTypeLabel','HUBType','Site Type'],
   'Site Priority Label': ['Site Priority Label','Site Priority','Site Class','SiteClass','Priority','Priority Label','SitePriorityLabel','Class'],
@@ -610,13 +596,13 @@ const CMDB_NEEDED_COLS = [...new Set([...CMDB_HEADER_DETECTION_COLS, ...SEG_COLS
 const CMDB_NEEDED_IDX = {}; CMDB_NEEDED_COLS.forEach((a,i)=>{CMDB_NEEDED_IDX[a]=i;});
 
 const SNAPSHOT_COLORS = [{fill:'DBEAFE',font:'1E40AF'},{fill:'D1FAE5',font:'065F46'},{fill:'FEF3C7',font:'92400E'},{fill:'FFEDD5',font:'9A3412'},{fill:'FEE2E2',font:'991B1B'},{fill:'F3E8FF',font:'6B21A8'},{fill:'FFE4E6',font:'9F1239'},{fill:'CCFBF1',font:'134E4A'}];
-const SDL_SOURCE_MAP = {'Key':'Key','Site Id':'Site Id','First Occurred(NT)':'Last Occurred(NT)','Last Occurred(NT)':'Last Occurred(NT)','Alarm':'Alarm','Alarm Identifier':'Alarm Identifier','BTS Name':'Site Name','Hub Type':'Hub Type','City':'City','MC':'MC','Area':'Area','Province':'Province','VIP':'VIP','Impact Category':'Impact Category','TT':'TT','WO':'WO','Power Alarm Name':'Power Alarm Name','Power Alarm Time':'Power Alarm Time','Mains Failure (Exal & PMS) Last Occur Time':'Mains Failure (Exal & PMS) Last Occur Time','Router Power Alarm':'Router Power Alarm','Router Power Alarm Time':'Router Power Alarm Time','Transport Outage':'Transport Outage','Actual Battery Backup Duration/(Minute)':'Actual Battery Backup Duration/(Minute)','Remark':'Remark'};
+const SDL_SOURCE_MAP = {'Key':'Key','Site Id':'Site Id','First Occurred(NT)':'First Occurred(NT)','Last Occurred(NT)':'Last Occurred(NT)','Alarm':'Alarm','Alarm Identifier':'Alarm Identifier','BTS Name':'Site Name','Hub Type':'Hub Type','City':'City','MC':'MC','Area':'Area','Province':'Province','VIP':'VIP','Impact Category':'Impact Category','TT':'TT','WO':'WO','Power Alarm Name':'Power Alarm Name','Power Alarm Time':'Power Alarm Time','Mains Failure (Exal & PMS) Last Occur Time':'Mains Failure (Exal & PMS) Last Occur Time','Router Power Alarm':'Router Power Alarm','Router Power Alarm Time':'Router Power Alarm Time','Transport Outage':'Transport Outage','Actual Battery Backup Duration/(Minute)':'Actual Battery Backup Duration/(Minute)','Remark':'Remark'};
 
 const FILE_SIZE_WARN_MB = 10, CHUNK_SIZE_CMDB = 5000;
 const STATUS_DOWN_COLOR = 'FF0000', STATUS_UP_COLOR = '00B050';
 const FONT_BLACK = '000000', FONT_WHITE = 'FFFFFF';
 
-let potFile = null, segFile = null, cmdbFile = null, zipFile = null;
+let potFile = null, cmdbFile = null, zipFile = null;
 let lastOutputBlob = null;
 let processing = false, cmdbLoading = false;
 let cmdbServerHasSource = false, cmdbServerBusy = false;
@@ -1161,15 +1147,26 @@ function autoMatch(targetCol, headers) {
   const aliases = Object.entries(COL_ALIASES)
     .filter(([name]) => norm(name) === nt)
     .flatMap(([, values]) => values);
-  for (const a of aliases) { const na = norm(a); const f = headers.find(h => norm(h) === na); if (f) return f; }
-  let f = headers.find(h => norm(h) === nt); if (f) return f;
-  for (const a of aliases) {
-    const na = norm(a); if (!na) continue;
-    f = headers.find(h => { const nh = norm(h); return nh && (nh.includes(na) || na.includes(nh)); });
-    if (f) return f;
+  const exactKeys = [...new Set([nt, ...aliases.map(norm)])];
+  for (const key of exactKeys) {
+    const exactMatch = headers.find(header => norm(header) === key);
+    if (exactMatch) return exactMatch;
   }
-  for (const h of headers) { const nh = norm(h); if (nh && (nh.includes(nt) || nt.includes(nh))) return h; }
-  return null;
+
+  const candidates = new Map();
+  for (const header of headers) {
+    const headerKey = norm(header);
+    if (headerKey.length < 6) continue;
+    for (const aliasKey of exactKeys) {
+      if (aliasKey.length < 6 || (!headerKey.includes(aliasKey) && !aliasKey.includes(headerKey))) continue;
+      if (Math.min(headerKey.length, aliasKey.length) / Math.max(headerKey.length, aliasKey.length) < 0.6) continue;
+      const score = Math.abs(headerKey.length - aliasKey.length);
+      if (!candidates.has(header) || score < candidates.get(header)) candidates.set(header, score);
+    }
+  }
+  if (!candidates.size) return null;
+  const ranked = [...candidates].sort((a, b) => a[1] - b[1]);
+  return ranked.length > 1 && ranked[0][1] === ranked[1][1] ? null : ranked[0][0];
 }
 function exactKeyMatch(headers) { return headers ? (headers.find(h => norm(h) === 'key') || null) : null; }
 function detectSDLHeader(rows, scan=30) {
@@ -1179,8 +1176,8 @@ function detectSDLHeader(rows, scan=30) {
     const ne = r.filter(c => c !== '' && c != null).length;
     if (ne < 2) continue;
     let s = ne;
-    if (r.some(h => norm(h) === 'key')) s += 100;
-    if (r.some(h => norm(h).includes('site') && norm(h).includes('id'))) s += 50;
+    if (exactKeyMatch(r)) s += 100;
+    if (autoMatch('Site Id', r)) s += 50;
     if (s > bestScore) { bestScore = s; bestIdx = i; }
   }
   return bestIdx >= 0 ? bestIdx : 0;
@@ -1190,7 +1187,7 @@ function findHeaderRow(rows, targetHeaders, scan=25) {
   for (let i = 0; i < Math.min(rows.length, scan); i++) {
     const r = rows[i]; if (!r) continue;
     let s = 0;
-    for (const t of targetHeaders) if (r.some(c => norm(c) === norm(t))) s++;
+    for (const t of targetHeaders) if (autoMatch(t, r)) s++;
     if (s > bestScore) { bestScore = s; bestRow = i; }
   }
   return bestScore >= 2 ? bestRow : -1;
@@ -1256,7 +1253,6 @@ function setFile(key, file) {
   if (key === 'cmdb' && cmdbLoading) { toast('Tunggu proses membaca CMDB selesai', 'warn'); return; }
   if (key === 'cmdb' && cmdbServerBusy) { toast('Tunggu proses server CMDB selesai', 'warn'); return; }
   if (key === 'pot') potFile = file;
-  else if (key === 'seg') segFile = file;
   else if (key === 'cmdb') { cmdbFile = file; clearCMDB(); cmdbLoading = true; log(`🆕 Membaca CMDB dan membuat database lokal`); }
   else zipFile = file;
   document.getElementById('info-' + key).classList.add('show');
@@ -1293,17 +1289,16 @@ function setFile(key, file) {
 function clearFile(key) {
   if (processing || (key === 'cmdb' && (cmdbLoading || cmdbServerBusy))) { toast('Tunggu proses yang sedang berjalan selesai', 'warn'); return; }
   if (key === 'pot') { potFile = null; document.getElementById('file-pot').value = ''; }
-  else if (key === 'seg') { segFile = null; document.getElementById('file-seg').value = ''; }
   else if (key === 'cmdb') { cmdbFile = null; document.getElementById('file-cmdb').value = ''; clearCMDB({deleteStored:true}); }
   else { zipFile = null; document.getElementById('file-zip').value = ''; }
   document.getElementById('info-' + key).classList.remove('show');
   document.getElementById('warn-' + key).textContent = '';
   checkReady();
 }
-function checkReady() { document.getElementById('btn-process').disabled = !(potFile && segFile && cmdbFile && CMDB_CACHE.meta.sites > 0) || processing || cmdbLoading; }
+function checkReady() { document.getElementById('btn-process').disabled = !(potFile && cmdbFile && CMDB_CACHE.meta.sites > 0) || processing || cmdbLoading; }
 
 /* ═══════════════ PROGRESS ═══════════════ */
-const stageIds = ['stage-pot','stage-seg','stage-zip','stage-base','stage-build','stage-agg','stage-excel'];
+const stageIds = ['stage-pot','stage-source','stage-zip','stage-base','stage-build','stage-agg','stage-excel'];
 function resetStages() {
   stageIds.forEach((id, i) => {
     const el = document.getElementById(id);
@@ -1386,25 +1381,14 @@ function applyBlackFontAll(ws, rows, cols, start=1) {
 }
 
 /* ═══════════════ GENSET LABEL ═══════════════ */
-function deriveGensetLabel(sidKey, gdocGensetRaw, segLookup, segHeader) {
-  const segRows = segLookup.get(sidKey);
-  if (segRows && segRows.length > 0) {
-    const gensetCol = autoMatch('Genset', segHeader);
-    if (gensetCol) {
-      const gIdx = segHeader.indexOf(gensetCol);
-      const gv = String(segRows[0][gIdx] || '').trim().toUpperCase();
-      if (gv === 'AUTO') return 'Genset Not Running';
-      if (gv === 'NOK' || gv === '' || gv === '-' || gv === 'N/A') return 'NO DG';
-      return 'Genset Not Running';
-    }
-  }
-  const pg = String(gdocGensetRaw || '').toUpperCase().trim();
-  if (!pg) return 'NO DG';
-  if (pg.includes('NO DG') || pg.includes('INACTIVE') || pg === 'NOT AVAILABLE') return 'NO DG';
-  return 'Genset Not Running';
+function deriveGensetLabel(sidKey, gdocGensetRaw) {
+  const status = `${cmdbGet(sidKey, 'Has Generator') || ''} ${cmdbGet(sidKey, 'DG Status') || ''} ${gdocGensetRaw || ''}`.toUpperCase();
+  if (/\b(NO|NOT AVAILABLE|INACTIVE|NOT ACTIVE|NOT RUN|NOT RUNNING|STOPPED|NOK)\b/.test(status)) return 'NO DG';
+  if (isDGRunning(status) || isDGAvailable(status)) return 'Genset Not Running';
+  return 'NO DG';
 }
 
-function getSummaryTransportOutage(sidKey, outputSegRowsBySiteId, outputSegHeader, segLookup, segHeader) {
+function getSummaryTransportOutage(sidKey, outputSegRowsBySiteId, outputSegHeader) {
   const outputTransportHeader = autoMatch('Transport Outage', outputSegHeader);
   if (outputTransportHeader) {
     const outputTransportIdx = outputSegHeader.indexOf(outputTransportHeader);
@@ -1417,13 +1401,7 @@ function getSummaryTransportOutage(sidKey, outputSegRowsBySiteId, outputSegHeade
     );
     if (outputTransport) return outputTransport;
   }
-  const cmdbTransport = String(cmdbGet(sidKey, 'Transport Outage') ?? '').trim();
-  if (cmdbTransport) return cmdbTransport;
-  const rows = segLookup.get(sidKey) || [];
-  const transportHeader = autoMatch('Transport Outage', segHeader);
-  if (!transportHeader) return '';
-  const transportIdx = segHeader.indexOf(transportHeader);
-  return dedupeValues(rows.map(row => row[transportIdx]).filter(value => value != null && String(value).trim() !== '').join(','), ', ');
+  return String(cmdbGet(sidKey, 'Transport Outage') ?? '').trim();
 }
 
 function getSummaryCMDBValue(sidKey, field, fallback) {
@@ -1441,7 +1419,7 @@ function getSummarySuperSiteProgram(sidKey) {
 function buildSummaryFromGDOCPG(params) {
   const {
     gdocRows, pgRowsOut, summaryRows, targetMC, siteKeyFn, powerAlarmSites,
-    segLookup, segHeader, segmentationRows, segmentationHeader
+    segmentationRows, segmentationHeader
   } = params;
   
   const pgData = pgRowsOut.slice(2);
@@ -1489,7 +1467,7 @@ function buildSummaryFromGDOCPG(params) {
       : '';
     const status = ['UP', 'DOWN'].includes(gdocStatus)
       ? gdocStatus
-      : (outputStatus || (segLookup.has(nid) ? 'DOWN' : 'UP'));
+      : (outputStatus || 'DOWN');
     const cmdbVIP = cmdbGet(nid, 'Is VIP');
     const site = {
       sid, nid,
@@ -1497,7 +1475,7 @@ function buildSummaryFromGDOCPG(params) {
       name: getSummaryCMDBValue(nid, 'Site Name*', r[GDOC_IDX.SITE_NAME]) || sid,
       mcArea: getSummaryCMDBValue(nid, 'MC Cluster', r[GDOC_IDX.MC_AREA]),
       hubType: getSummaryCMDBValue(nid, 'HUB Type', r[GDOC_IDX.HUB_TYPE]),
-      transport: getSummaryTransportOutage(nid, outputSegRowsBySiteId, segmentationHeader, segLookup, segHeader),
+      transport: getSummaryTransportOutage(nid, outputSegRowsBySiteId, segmentationHeader),
       gdocGenset: String(r[GDOC_IDX.GENSET] || '').trim(),
       superSiteProgram: getSummarySuperSiteProgram(nid),
       traffic: getSummaryCMDBValue(nid, 'Traffic Class', r[GDOC_IDX.TRAFFIC]),
@@ -1615,7 +1593,7 @@ function buildSummaryFromGDOCPG(params) {
     }
     let siteList = [];
     if (cat.showSites) {
-      siteList = sitesDown.map(s => ({ name: s.name || s.sid, transport: s.transport || '', genset: deriveGensetLabel(s.nid, s.gdocGenset, segLookup, segHeader) }));
+      siteList = sitesDown.map(s => ({ name: s.name || s.sid, transport: s.transport || '', genset: deriveGensetLabel(s.nid, s.gdocGenset) }));
     }
     categoryResults.push({
       key: cat.key, name: cat.name, format: cat.format, showSites: cat.showSites,
@@ -1671,7 +1649,7 @@ function generateSummaryText(summary) {
       lines.push(`${summary.targetMC} : ${summary.powerAlarmMcCount}`);
     }
     lines.push('');
-    lines.push(`Sites UP (Site tidak ada di Segmentation Info / sudah pulih): ${summary.upSites.length}`);
+    lines.push(`Sites UP (status eksplisit dari POT): ${summary.upSites.length}`);
     if (summary.upSites.length) {
       for (const site of summary.upSites) {
         const parts = [site.sid];
@@ -1757,7 +1735,7 @@ function renderSummary(summary) {
 
 /* ═══════════════ MAIN PROCESS ═══════════════ */
 async function process() {
-  if (processing || cmdbLoading || !potFile || !segFile || !cmdbFile || CMDB_CACHE.meta.sites === 0) return;
+  if (processing || cmdbLoading || !potFile || !cmdbFile || CMDB_CACHE.meta.sites === 0) return;
   processing = true;
   lastOutputBlob = null;
   document.getElementById('result-card').classList.remove('show');
@@ -1794,14 +1772,10 @@ async function process() {
     doneStage('stage-pot', summaryRows.length + ' baris · ' + summaryName);
     await sleep(100);
 
-    /* 2. SEG + CMDB READ */
-    startStage('stage-seg');
+    /* 2. CMDB READ */
+    startStage('stage-source');
     await sleep(100);
-    const segBuf = await segFile.arrayBuffer();
-    const segWb = XLSX.read(segBuf, {type:'array', cellDates:true, cellNF:false, cellText:false});
-    const segName = findSheet(segWb, ['segmentation','segment info','segment_info','site']) || segWb.SheetNames[0];
-    const segRowsRaw = sheetToAOA(segWb, segName);
-    log('SEG: ' + segRowsRaw.length + ' baris');
+    log('Sumber status dan data: POT Site Down List + CMDB');
 
     let cmdbRowsRaw = null, cmdbHeaderStore = null, cmdbColIdxMapStore = null;
     let cmdbSignature = null, cmdbSheetUsed = null, cmdbHeaderIdx = null;
@@ -1848,7 +1822,7 @@ async function process() {
     } else {
       log('ℹ️ CMDB tidak diupload');
     }
-    doneStage('stage-seg', segRowsRaw.length + ' SEG · ' + (cmdbRowsRaw ? cmdbRowsRaw.length + ' CMDB' : (CMDB_CACHE.meta.sites > 0 ? CMDB_CACHE.meta.sites + ' cached' : '-')));
+    doneStage('stage-source', (cmdbRowsRaw ? cmdbRowsRaw.length + ' CMDB rows' : CMDB_CACHE.meta.sites + ' cached sites'));
     await sleep(100);
 
     const siteKeyFn = useNormSite ? normSiteId : (s => String(s??'').trim().toUpperCase());
@@ -1905,12 +1879,6 @@ async function process() {
     const sdlSiteIdx = sdlHeader.indexOf(sdlSiteCol);
     const headerLen = sdlHeader.length;
 
-    const sdlMap = {};
-    for (const [tc, target] of Object.entries(SDL_SOURCE_MAP)) {
-      let f = (norm(tc)==='key'||norm(target)==='key') ? exactKeyMatch(sdlHeader) : autoMatch(target, sdlHeader);
-      if (f) sdlMap[tc] = sdlHeader.indexOf(f);
-    }
-
     const rawDataRows = sdlRows.slice(sdlHeaderIdx + 1);
     const padded = rawDataRows.map(r => padRow(r, headerLen));
     const sdlData = padded.filter(r => r.some(c => c !== '' && c != null));
@@ -1922,38 +1890,6 @@ async function process() {
       const k = r[sdlKeyIdx], s = r[sdlSiteIdx];
       if ((k===''||k==null) && s!=='' && s!=null && lastKey!=='') r[sdlKeyIdx] = lastKey;
       else if (k!=='' && k!=null) lastKey = k;
-    }
-
-    const segHeaderRowIdx = (() => {
-      for (let i = 0; i < Math.min(15, segRowsRaw.length); i++) {
-        const r = segRowsRaw[i] || [];
-        if (r.some(h => norm(h).includes('site') && norm(h).includes('id'))) return i;
-      }
-      return 0;
-    })();
-    const segHeader = segRowsRaw[segHeaderRowIdx] || [];
-    const segData = segRowsRaw.slice(segHeaderRowIdx+1).filter(r => r && r.some(c => c!==''&&c!=null));
-
-    const segSiteCol = autoMatch('Site Id', segHeader);
-    if (!segSiteCol) throw new Error('Kolom Site Id tidak ditemukan di Segmentation');
-    const segLookup = new Map();
-    const segSiteIdSet = new Set();
-    const segSiteIdIdx = segHeader.indexOf(segSiteCol);
-    for (const r of segData) {
-      const sidKey = siteKeyFn(r[segSiteIdIdx]); if (!sidKey) continue;
-      segSiteIdSet.add(sidKey);
-      const arr = segLookup.get(sidKey); if (arr) arr.push(r); else segLookup.set(sidKey, [r]);
-    }
-    if (!segSiteIdSet.size) throw new Error('Segmentation tidak memiliki Site Id yang dapat diproses');
-
-    const sdlSideMap = new Map();
-    const sdlBySiteId = new Map();
-    for (const sdlRow of sdlData) {
-      const key = String(sdlRow[sdlKeyIdx] ?? '');
-      const sidKey = siteKeyFn(sdlRow[sdlSiteIdx]);
-      if (!sidKey) continue;
-      sdlBySiteId.set(sidKey, sdlRow);
-      if (key) sdlSideMap.set(key + '||' + sidKey, sdlRow);
     }
 
     function sdlGet(sdlRow, alias) {
@@ -1977,40 +1913,37 @@ async function process() {
 
     const statusByRow = [];
     let downCount = 0;
+    const sourceStatusHeader = autoMatch('Status', sdlHeader);
+    const sourceStatusIdx = sourceStatusHeader ? sdlHeader.indexOf(sourceStatusHeader) : -1;
+    const sourceRemarkHeader = autoMatch('Remark', sdlHeader);
+    const sourceRemarkIdx = sourceRemarkHeader ? sdlHeader.indexOf(sourceRemarkHeader) : -1;
     for (const r of sdlData) {
-      const sidKey = siteKeyFn(r[sdlSiteIdx]);
-      const isDown = sidKey && segSiteIdSet.has(sidKey);
-      statusByRow.push(isDown ? 'DOWN' : 'UP');
-      if (isDown) downCount++;
+      const sourceStatus = sourceStatusIdx >= 0 ? String(r[sourceStatusIdx] ?? '').trim().toUpperCase() : '';
+      const remark = sourceRemarkIdx >= 0 ? String(r[sourceRemarkIdx] ?? '').trim().toUpperCase() : '';
+      const remarkStatuses = new Set(remark.match(/\b(?:UP|DOWN)\b/g) || []);
+      const remarkStatus = /(?:SUDAH|ALREADY)\s+UP/.test(remark)
+        ? 'UP'
+        : (remarkStatuses.size === 1 ? remarkStatuses.values().next().value : '');
+      const status = ['UP', 'DOWN'].includes(sourceStatus) ? sourceStatus : (remarkStatus || 'DOWN');
+      statusByRow.push(status);
+      if (status === 'DOWN') downCount++;
     }
-    log('Status: DOWN=' + downCount + ' · UP=' + (sdlData.length - downCount));
+    log(`Status dari POT Site Down List: DOWN=${downCount} · UP=${sdlData.length - downCount}${sourceStatusIdx < 0 && sourceRemarkIdx < 0 ? ' · default DOWN' : ''}`);
     const cacheInfo = CMDB_CACHE.meta.sites > 0 ? ` · ${CMDB_CACHE.meta.sites} cached` : '';
     doneStage('stage-base', sdlData.length + ' SDL · DOWN=' + downCount + cacheInfo);
     await sleep(100);
 
-    /* 5. Segmentation */
+    /* 5. Build output from POT + CMDB */
     startStage('stage-build');
     await sleep(100);
     const useDyn = headerMode === 'dynamic';
 
-    const segColMap = {};
-    for (const tc of SEG_COLS) {
-      if (SDL_SOURCE_MAP[tc] !== undefined) continue;
-      const f = autoMatch(tc, segHeader);
-      if (f) segColMap[tc] = segHeader.indexOf(f);
-    }
-
-    const sdlBTSIdx = (() => { const f = autoMatch('BTS Name', sdlHeader); return f ? sdlHeader.indexOf(f) : -1; })();
-    const segSiteNameIdx = (() => { const f = autoMatch('Site Name', segHeader); return f ? segHeader.indexOf(f) : -1; })();
-
-    function aggValue(sidKey, colIdx) {
-      const rows = segLookup.get(sidKey); if (!rows) return '';
-      const vals = [];
-      for (const r of rows) {
-        const v = r[colIdx];
-        if (v !== '' && v != null) vals.push(v instanceof Date ? displayCell(v) : v);
-      }
-      return vals.join(',');
+    const sdlMap = {};
+    for (const column of SEG_COLS) {
+      const sourceColumn = SDL_SOURCE_MAP[column] || column;
+      let sourceHeader = column === 'Key' ? exactKeyMatch(sdlHeader) : autoMatch(sourceColumn, sdlHeader);
+      if (!sourceHeader && column === 'First Occurred(NT)') sourceHeader = autoMatch('Last Occurred(NT)', sdlHeader);
+      if (sourceHeader) sdlMap[column] = sdlHeader.indexOf(sourceHeader);
     }
 
     function isBlankCell(value) {
@@ -2050,40 +1983,24 @@ async function process() {
       const sidRaw = sdlRow[sdlSiteIdx];
       const sidKey = siteKeyFn(sidRaw);
       const status = statusByRow[i];
-      const recoveryNote = status === 'UP' ? 'Site tidak ada di Segmentation Info (sudah UP)' : '';
+      const recoveryNote = status === 'UP' ? 'Status UP dari POT' : '';
       let rowOut;
       if (useDyn) {
         rowOut = [];
         for (const hCol of outHeader) {
           if (norm(hCol) === norm('Status')) { rowOut.push(status); continue; }
           if (norm(hCol) === norm('Recovery Note')) { rowOut.push(recoveryNote); continue; }
-          const sdlIdx = sdlHeader.indexOf(hCol);
+          const mappedColumn = SEG_COLS.find(column => norm(column) === norm(hCol));
+          const sdlIdx = mappedColumn ? sdlMap[mappedColumn] : sdlHeader.findIndex(header => norm(header) === norm(hCol));
           if (sdlIdx >= 0) { rowOut.push(sdlRow[sdlIdx] ?? ''); continue; }
-          const segKey = Object.keys(segColMap).find(k => norm(k) === norm(hCol));
-          if (segKey) { rowOut.push(aggValue(sidKey, segColMap[segKey])); continue; }
           rowOut.push('');
         }
       } else {
         rowOut = [];
         for (const tc of SEG_COLS) {
           let val = '';
-          if (SDL_SOURCE_MAP[tc] !== undefined) {
-            if (tc === 'BTS Name') {
-              let found = false;
-              if (sdlMap[tc] !== undefined) { const v = sdlRow[sdlMap[tc]]; if (v!=='' && v!=null) { val=v; found=true; } }
-              if (!found && sdlBTSIdx >= 0) { const v = sdlRow[sdlBTSIdx]; if (v!=='' && v!=null) { val=v; found=true; } }
-              if (!found && segSiteNameIdx >= 0) { const v = aggValue(sidKey, segSiteNameIdx); if (v) { val=v; found=true; } }
-              if (!found) val = cmdbGet(sidKey, 'Site Name*');
-            } else if (tc === 'Key') {
-              val = sdlRow[sdlMap[tc]] ?? '';
-            } else if (tc === 'Site Id') {
-              val = String(sdlRow[sdlSiteIdx] ?? '').trim();
-            } else if (sdlMap[tc] !== undefined) {
-              val = sdlRow[sdlMap[tc]] ?? '';
-            }
-          } else if (segColMap[tc] !== undefined) {
-            val = aggValue(sidKey, segColMap[tc]);
-          }
+          if (tc === 'Site Id') val = String(sdlRow[sdlSiteIdx] ?? '').trim();
+          else if (sdlMap[tc] !== undefined) val = sdlRow[sdlMap[tc]] ?? '';
           rowOut.push(val);
         }
         rowOut.push(status);
@@ -2183,19 +2100,14 @@ async function process() {
     }
 
     // GDOC indexes every unfiltered segmentation row by its Site Id, independently of display filters.
-    const remarkColIdx = outHeader.findIndex(header => norm(header) === norm('Remark'));
     const segmentationStatusColIdx = outHeader.findIndex(header => norm(header) === norm('Status'));
-    function gdocStatus(segRow, sidKey, fallbackStatus) {
+    function gdocStatus(segRow, fallbackStatus) {
       if (segmentationStatusColIdx >= 0) {
         const status = String(segRow[segmentationStatusColIdx] ?? '').trim().toUpperCase();
         if (status === 'UP' || status === 'DOWN') return status;
       }
-      const remark = remarkColIdx >= 0 ? String(segRow[remarkColIdx] ?? '').trim().toUpperCase() : '';
-      const remarkStatuses = new Set(remark.match(/\b(?:UP|DOWN)\b/g) || []);
-      if (remark.includes('SUDAH UP') || remark.includes('ALREADY UP')) return 'UP';
-      if (remarkStatuses.size === 1) return remarkStatuses.values().next().value;
       if (fallbackStatus === 'UP' || fallbackStatus === 'DOWN') return fallbackStatus;
-      return segSiteIdSet.has(sidKey) ? 'DOWN' : 'UP';
+      return 'DOWN';
     }
     const gdocSites = new Map();
     const expectedGdocSiteIds = new Set();
@@ -2221,30 +2133,9 @@ async function process() {
           potRow,
           siteId: sidRaw,
           segRow,
-          status: gdocStatus(segRow, sidKey, statusByRow[i]) === 'DOWN' ? 'DOWN' : 'UP',
+          status: gdocStatus(segRow, statusByRow[i]) === 'DOWN' ? 'DOWN' : 'UP',
           snapshotTime
         });
-      }
-    }
-    for (const segRow of segRowsOut.slice(1)) {
-      const sidRaw = String(segRow[siteColIdx] ?? '').trim();
-      const sidKey = siteKeyFn(sidRaw);
-      if (!sidKey) continue;
-      expectedGdocSiteIds.add(sidKey);
-      const key = String(segRow[keyColIdx] ?? '');
-      const match = key.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/);
-      const snapshotTime = match ? `${match[1]} ${match[2]}` : key;
-      const previous = gdocSites.get(sidKey);
-      if (!previous || snapshotTime.localeCompare(previous.snapshotTime) >= 0) {
-        gdocSites.set(sidKey, {
-          potRow: sdlSideMap.get(key + '||' + sidKey) || previous?.potRow || null,
-          siteId: sidRaw,
-          segRow,
-          status: gdocStatus(segRow, sidKey, segRow[segmentationStatusColIdx]),
-          snapshotTime
-        });
-      } else {
-        previous.siteId = sidRaw;
       }
     }
     const missingGdocSiteIds = [...expectedGdocSiteIds].filter(sidKey => !gdocSites.has(sidKey));
@@ -2282,23 +2173,19 @@ async function process() {
         return idx >= 0 ? segRow[idx] ?? '' : '';
       };
       const origSdl = potRow;
-      const segValue = column => {
-        const idx = segColMap[column];
-        return idx === undefined ? '' : aggValue(sidKey, idx);
-      };
-      const mcArea = get('MC')||sdlGet(origSdl,'MC')||segValue('MC')||cmdbGet(sidKey,'MC Cluster');
-      let scRaw = get('Site Class(Priority)')||sdlGet(origSdl,'Site Class(Priority)')||sdlGet(origSdl,'Site Class')||segValue('Site Class(Priority)')||cmdbGet(sidKey,'Site Priority Label');
+      const mcArea = get('MC')||sdlGet(origSdl,'MC')||cmdbGet(sidKey,'MC Cluster');
+      let scRaw = get('Site Class(Priority)')||sdlGet(origSdl,'Site Class(Priority)')||sdlGet(origSdl,'Site Class')||cmdbGet(sidKey,'Site Priority Label');
       const sc = dedupeValues(scRaw,'/');
-      const ss = get('Super Sites')||sdlGet(origSdl,'Super Sites')||segValue('Super Sites')||cmdbGet(sidKey,'Program')||cmdbGet(sidKey,'Is Hub')||sdlGet(origSdl,'Is Hub')||'No';
-      const t2 = get('>2TB')||sdlGet(origSdl,'>2TB')||sdlGet(origSdl,'Traffic Class')||segValue('>2TB')||cmdbGet(sidKey,'Traffic Class')||'No';
-      const p0 = get('P0')||sdlGet(origSdl,'P0')||sdlGet(origSdl,'P0 Sites')||segValue('P0')||cmdbGet(sidKey,'P0 Sites')||'No';
-      const vv = get('VVIP')||sdlGet(origSdl,'VVIP')||segValue('VVIP');
-      const vi = get('VIP')||sdlGet(origSdl,'VIP')||segValue('VIP')||cmdbGet(sidKey,'Is VIP')||'No';
-      const sn = get('BTS Name')||sdlGet(origSdl,'Site Name')||segValue('BTS Name')||cmdbGet(sidKey,'Site Name*');
-      const ht = get('Hub Type')||sdlGet(origSdl,'Hub Type')||segValue('Hub Type')||cmdbGet(sidKey,'HUB Type');
+      const ss = get('Super Sites')||sdlGet(origSdl,'Super Sites')||cmdbGet(sidKey,'Program')||cmdbGet(sidKey,'Is Hub')||sdlGet(origSdl,'Is Hub')||'No';
+      const t2 = get('>2TB')||sdlGet(origSdl,'>2TB')||sdlGet(origSdl,'Traffic Class')||cmdbGet(sidKey,'Traffic Class')||'No';
+      const p0 = get('P0')||sdlGet(origSdl,'P0')||sdlGet(origSdl,'P0 Sites')||cmdbGet(sidKey,'P0 Sites')||'No';
+      const vv = get('VVIP')||sdlGet(origSdl,'VVIP');
+      const vi = get('VIP')||sdlGet(origSdl,'VIP')||cmdbGet(sidKey,'Is VIP')||'No';
+      const sn = get('BTS Name')||sdlGet(origSdl,'Site Name')||cmdbGet(sidKey,'Site Name*');
+      const ht = get('Hub Type')||sdlGet(origSdl,'Hub Type')||cmdbGet(sidKey,'HUB Type');
       const fo = cmdbGet(sidKey,'FM Office*');
       const rs = cmdbGet(sidKey,'Rts Name')||cmdbGet(sidKey,'Rts Id');
-      const transport = get('Transport Outage')||sdlGet(origSdl,'Transport Outage')||segValue('Transport Outage');
+      const transport = get('Transport Outage')||sdlGet(origSdl,'Transport Outage')||cmdbGet(sidKey,'Transport Outage');
       const previousOutage = get('Previous Status Outage')||sdlGet(origSdl,'Previous Status Outage')||cmdbGet(sidKey,'Previous Status Outage');
       const gensetDeploy = get('Genset Deploy Status')||sdlGet(origSdl,'Genset Deploy Status')||cmdbGet(sidKey,'Genset Deploy Status');
       const additionalMCGenset = get('Additional MC>25% Portable Genset run')||sdlGet(origSdl,'Additional MC>25% Portable Genset run')||cmdbGet(sidKey,'Additional MC>25% Portable Genset run');
@@ -2318,7 +2205,7 @@ async function process() {
       gdocRows: gdocRowsOut, pgRowsOut,
       summaryRows,
       targetMC, siteKeyFn,
-      powerAlarmSites: zipFoundSites, segLookup, segHeader,
+      powerAlarmSites: zipFoundSites,
       segmentationRows: segRowsForGDOC, segmentationHeader: outHeader
     });
     renderSummary(summary);
@@ -2519,10 +2406,10 @@ function downloadLog() {
 }
 function resetAll() {
   if (processing || cmdbLoading || cmdbServerBusy) { toast('Tunggu proses yang sedang berjalan selesai', 'warn'); return; }
-  potFile = null; segFile = null; cmdbFile = null; zipFile = null; lastOutputBlob = null;
-  ['file-pot','file-seg','file-cmdb','file-zip'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
-  ['info-pot','info-seg','info-cmdb','info-zip'].forEach(id => document.getElementById(id).classList.remove('show'));
-  ['warn-pot','warn-seg','warn-cmdb','warn-zip'].forEach(id => { const e = document.getElementById(id); if (e) e.textContent = ''; });
+  potFile = null; cmdbFile = null; zipFile = null; lastOutputBlob = null;
+  ['file-pot','file-cmdb','file-zip'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  ['info-pot','info-cmdb','info-zip'].forEach(id => document.getElementById(id).classList.remove('show'));
+  ['warn-pot','warn-cmdb','warn-zip'].forEach(id => { const e = document.getElementById(id); if (e) e.textContent = ''; });
   document.getElementById('progress-card').classList.remove('show');
   document.getElementById('result-card').classList.remove('show');
   document.getElementById('summary-card').classList.remove('show');
@@ -2535,7 +2422,6 @@ function resetAll() {
 }
 
 bindDrop('dz-pot','file-pot','pot');
-bindDrop('dz-seg','file-seg','seg');
 bindDrop('dz-cmdb','file-cmdb','cmdb');
 bindDrop('dz-zip','file-zip','zip');
 updateCMDBServerButtons();
