@@ -16,22 +16,20 @@ Saat halaman dibuka, menu awal menyediakan tautan **Yuk Bikin POT**, **POT Autom
 
 Pilih **Excel Compiler** pada menu awal untuk menggabungkan 2 sampai 20 file `.xlsx`, `.xls`, atau `.csv` menjadi satu sheet. Sertakan setidaknya satu `.xlsx` sebagai template agar workbook hasil mempertahankan sheet dan formatnya; baris dari file lain dipetakan berdasarkan header (tidak peka kapitalisasi dan spasi) dan urutan kolom template. Header yang berbeda, duplikat, atau kosong ditolak agar nilai tidak bergeser. Batas total upload adalah 500 MiB. Upload dan workbook dibaca/ditulis bertahap melalui file sementara agar penggunaan memori tetap terkendali.
 
-Fitur ini menggunakan Python API pada deployment Docker. Masukkan `CMDB_API_TOKEN` yang sama seperti fitur CMDB. GitHub Pages bersifat statis dan tidak menjalankan API Python, sehingga Excel Compiler memerlukan deployment Docker.
+Fitur ini menggunakan Python API pada deployment Docker. Atur token khusus API Excel melalui `EXCEL_API_TOKEN`; token dimasukkan pada halaman Excel Compiler dan tidak digunakan oleh database CMDB browser. GitHub Pages bersifat statis dan tidak menjalankan API Python, sehingga Excel Compiler memerlukan deployment Docker.
 
 ## Database CMDB
 
-Deployment Docker menyediakan API CMDB terautentikasi dan menyimpan file pada named volume persisten `cmdb_data` di `/data/cmdb`. File tetap divalidasi dan diproses di browser; salinan sumber hanya dikirim ke server ketika tombol **Simpan CMDB** atau **Update CMDB** digunakan. Tombol **Muat Server** mengambil salinan tersimpan. IndexedDB tetap digunakan sebagai cache browser lokal.
+CMDB diproses di browser. Sumbernya disimpan sebagai cache lokal di IndexedDB bila browser mendukungnya; tidak ada API maupun penyimpanan CMDB di server.
 
-Atur token rahasia sebelum menjalankan deployment:
+Atur token API Excel sebelum menjalankan deployment:
 
 ```sh
-export CMDB_API_TOKEN="$(openssl rand -hex 32)"
+export EXCEL_API_TOKEN="$(openssl rand -hex 32)"
 sh deploy.sh
 ```
 
-Masukkan token yang sama pada kontrol server di kartu CMDB. Token hanya disimpan di memori halaman dan tidak dimasukkan ke repository. **Simpan CMDB** membuat salinan server pertama; **Update CMDB** memvalidasi file yang dipilih di browser lalu mengganti salinan server; **Muat Server** memulihkan file tersebut ke aplikasi. Batas upload adalah 100 MB. Data server bertahan selama volume `cmdb_data` dipertahankan.
-
-Layanan web di-bind ke `127.0.0.1` secara default dan port dapat diubah, misalnya `PORT=9000 sh deploy.sh`. Untuk akses jaringan, tempatkan di belakang reverse proxy HTTPS dan batasi akses ke pengguna/jaringan yang berwenang. Jangan kirim token melalui koneksi HTTP publik. GitHub Pages bersifat static dan tidak menyediakan API/penyimpanan CMDB server; fitur server hanya tersedia pada deployment Docker ini.
+Masukkan token ini pada halaman Excel Compiler. Token diperlukan hanya untuk API kompilasi Excel. Layanan web di-bind ke `127.0.0.1` secara default dan port dapat diubah, misalnya `PORT=9000 sh deploy.sh`. Untuk akses jaringan, tempatkan di belakang reverse proxy HTTPS dan batasi akses ke pengguna/jaringan yang berwenang. Jangan kirim token melalui koneksi HTTP publik. GitHub Pages bersifat statis dan tidak menyediakan API kompilasi Excel.
 
 ## Pencocokan site
 

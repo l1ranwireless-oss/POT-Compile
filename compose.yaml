@@ -1,21 +1,15 @@
 services:
-  cmdb-api:
+  excel-api:
     build:
       context: .
       dockerfile: Dockerfile.api
     restart: unless-stopped
     environment:
-      CMDB_API_TOKEN: "${CMDB_API_TOKEN:?Set CMDB_API_TOKEN before deployment}"
-      CMDB_DATA_DIR: /data/cmdb
-    volumes:
-      - cmdb_data:/data/cmdb
+      EXCEL_API_TOKEN: "${EXCEL_API_TOKEN:?Set EXCEL_API_TOKEN before deployment}"
   web:
     build: .
     restart: unless-stopped
     depends_on:
-      - cmdb-api
+      - excel-api
     ports:
       - "127.0.0.1:${PORT:-8080}:80"
-
-volumes:
-  cmdb_data:

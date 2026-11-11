@@ -3,12 +3,9 @@ FROM python:3.12-alpine
 WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt \
-    && adduser -D -u 10001 app \
-    && mkdir -p /data/cmdb \
-    && chown -R app:app /data/cmdb
-COPY cmdb_server.py excel_compiler.py /app/
+    && adduser -D -u 10001 app
+COPY excel_server.py excel_compiler.py /app/
 USER app
 
-ENV CMDB_DATA_DIR=/data/cmdb
 EXPOSE 8000
-CMD ["python", "-u", "/app/cmdb_server.py"]
+CMD ["python", "-u", "/app/excel_server.py"]
