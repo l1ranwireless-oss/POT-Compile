@@ -8,6 +8,7 @@ from http.server import ThreadingHTTPServer
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from openpyxl import Workbook, load_workbook
 
@@ -65,7 +66,115 @@ class ExcelServerTests(unittest.TestCase):
     def test_api_health_reports_python_and_cmdb_database_ready(self):
         with urlopen(self.base_url + "/api/health") as response:
             self.assertEqual(response.status, 200)
-            self.assertEqual(json.loads(response.read()), {"status": "ok"})
+            self.assertEqual(json.loads(response.read()), {
+                "status": "ok",
+                "cmdb_storage": "sqlite",
+            })
+
+    def test_api_health_confirms_postgres_connection(self):
+        from excel_server import make_handler
+
+        with patch("excel_server.initialize_postgres_cmdb"), patch(
+            "excel_server.psycopg.connect"
+        ) as connect:
+            connect.return_value.__enter__.return_value = MagicMock()
+            handler = make_handler(
+                self.database_path,
+                cmdb_database_url="postgresql://test",
+            )
+            server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                with urlopen(f"http://127.0.0.1:{server.server_port}/api/health") as response:
+                    result = json.loads(response.read())
+                self.assertEqual(result, {
+                    "status": "ok",
+                    "cmdb_storage": "postgresql",
+                    "postgres": "ok",
+                })
+                connect.assert_called_with("postgresql://test", connect_timeout=5)
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join()
+
+    def test_cmdb_save_in_postgres_uses_insert_without_overwriting_existing_data(self):
+        from excel_server import store_cmdb_in_postgres
+
+        connection = MagicMock()
+        connection.execute.return_value.fetchone.return_value = (1,)
+        with patch("excel_server.psycopg.connect") as connect:
+            connect.return_value.__enter__.return_value = connection
+            status, result = store_cmdb_in_postgres(
+                "postgresql://test", "save", "cmdb.xlsx", b"CMDB", "2026-11-11T00:00:00+00:00"
+            )
+        self.assertEqual(status, 200)
+        self.assertEqual(result["size"], 4)
+        self.assertIn("ON CONFLICT (id) DO NOTHING", connection.execute.call_args.args[0])
+
+    def test_cmdb_update_in_postgres_requires_existing_file(self):
+        from excel_server import store_cmdb_in_postgres
+
+        connection = MagicMock()
+        connection.execute.return_value.fetchone.return_value = None
+        with patch("excel_server.psycopg.connect") as connect:
+            connect.return_value.__enter__.return_value = connection
+            status, result = store_cmdb_in_postgres(
+                "postgresql://test", "update", "cmdb.xlsx", b"CMDB", "2026-11-11T00:00:00+00:00"
+            )
+        self.assertEqual(status, 404)
+        self.assertIn("gunakan Simpan CMDB", result["error"])
+
+    def test_existing_sqlite_cmdb_migrates_to_empty_postgres_storage(self):
+        from excel_server import initialize_postgres_cmdb
+
+        content = b"legacy CMDB"
+        with sqlite3.connect(self.database_path) as connection:
+            connection.execute(
+                "INSERT INTO cmdb_files (id, name, content, size, updated_at) "
+                "VALUES (1, ?, zeroblob(?), ?, ?)",
+                ("legacy.xlsx", len(content), len(content), "2026-11-11T00:00:00+00:00"),
+            )
+            with connection.blobopen("cmdb_files", "content", 1, readonly=False) as blob:
+                blob.write(content)
+
+        postgres = MagicMock()
+        postgres.execute.return_value.fetchone.return_value = None
+        with patch("excel_server.psycopg.connect") as connect:
+            connect.return_value.__enter__.return_value = postgres
+            initialize_postgres_cmdb("postgresql://test", self.database_path)
+        migration = postgres.execute.call_args_list[-1]
+        self.assertIn("INSERT INTO cmdb_source_files", migration.args[0])
+        self.assertEqual(migration.args[1], ("legacy.xlsx", content, len(content), "2026-11-11T00:00:00+00:00"))
+
+    def test_cmdb_status_reports_postgres_as_active_storage(self):
+        from excel_server import make_handler
+
+        postgres = MagicMock()
+        postgres.execute.return_value.fetchone.return_value = (
+            "cmdb.xlsx", 4, "2026-11-11T00:00:00+00:00"
+        )
+        with patch("excel_server.initialize_postgres_cmdb"), patch(
+            "excel_server.psycopg.connect"
+        ) as connect:
+            connect.return_value.__enter__.return_value = postgres
+            handler = make_handler(
+                self.database_path,
+                cmdb_database_url="postgresql://test",
+            )
+            server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                with urlopen(f"http://127.0.0.1:{server.server_port}/api/cmdb") as response:
+                    result = json.loads(response.read())
+                self.assertEqual(result["storage"], "postgresql")
+                self.assertEqual(result["name"], "cmdb.xlsx")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join()
 
     def test_postgres_staging_reports_disabled_without_database_url(self):
         with urlopen(self.base_url + "/api/cmdb/staging") as response:

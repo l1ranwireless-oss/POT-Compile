@@ -240,7 +240,9 @@
           const result = await response.json();
           if (result.status !== 'ok') throw new Error(result.error || 'API tidak siap');
           apiReady = true;
-          apiStatusBox.textContent = 'Python API aktif dan siap digunakan.';
+          apiStatusBox.textContent = result.cmdb_storage === 'postgresql' && result.postgres === 'ok'
+            ? 'Python API aktif · PostgreSQL terhubung.'
+            : 'Python API aktif · penyimpanan CMDB menggunakan SQLite.';
           apiStatusBox.className = 'status success';
           updateControls();
           return;

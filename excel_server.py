@@ -102,6 +102,71 @@ def initialize_staging_database(database_url):
         )
 
 
+def initialize_postgres_cmdb(database_url, sqlite_database_path):
+    with psycopg.connect(database_url, connect_timeout=10) as connection:
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS cmdb_source_files (
+                id SMALLINT PRIMARY KEY CHECK (id = 1),
+                name TEXT NOT NULL,
+                content BYTEA NOT NULL,
+                size BIGINT NOT NULL CHECK (size > 0),
+                updated_at TEXT NOT NULL,
+                CHECK (octet_length(content) = size)
+            )
+        """)
+        existing = connection.execute(
+            "SELECT id FROM cmdb_source_files WHERE id = 1"
+        ).fetchone()
+        if existing is not None:
+            return
+
+        sqlite_connection = sqlite3.connect(sqlite_database_path)
+        try:
+            row = sqlite_connection.execute(
+                "SELECT id, name, size, updated_at FROM cmdb_files WHERE id = 1"
+            ).fetchone()
+            if row is None:
+                return
+            with sqlite_connection.blobopen(
+                "cmdb_files", "content", row[0], readonly=True
+            ) as blob:
+                content = blob.read()
+        finally:
+            sqlite_connection.close()
+        connection.execute(
+            "INSERT INTO cmdb_source_files (id, name, content, size, updated_at) "
+            "VALUES (1, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING",
+            (row[1], content, row[2], row[3]),
+        )
+        logging.getLogger(__name__).info("Migrated saved CMDB file into PostgreSQL")
+
+
+def store_cmdb_in_postgres(database_url, action, filename, content, updated_at):
+    with psycopg.connect(database_url, connect_timeout=10) as connection:
+        if action == "save":
+            saved = connection.execute(
+                "INSERT INTO cmdb_source_files (id, name, content, size, updated_at) "
+                "VALUES (1, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING RETURNING id",
+                (filename, content, len(content), updated_at),
+            ).fetchone()
+            if saved is None:
+                return 409, {"error": "CMDB sudah tersimpan; gunakan Update CMDB"}
+        else:
+            saved = connection.execute(
+                "UPDATE cmdb_source_files SET name = %s, content = %s, size = %s, updated_at = %s "
+                "WHERE id = 1 RETURNING id",
+                (filename, content, len(content), updated_at),
+            ).fetchone()
+            if saved is None:
+                return 404, {"error": "CMDB belum tersimpan; gunakan Simpan CMDB"}
+    return 200, {
+        "exists": True,
+        "name": filename,
+        "size": len(content),
+        "updated_at": updated_at,
+    }
+
+
 def start_staging_cleanup_worker(database_url, interval_seconds=900):
     def cleanup_loop():
         while True:
@@ -186,8 +251,15 @@ def migrate_legacy_cmdb(connection, data_dir):
     logging.getLogger(__name__).info("Migrated saved CMDB file into SQLite")
 
 
-def make_handler(database_path, staging_database_url=None, staging_ttl_seconds=86400):
+def make_handler(
+    database_path,
+    staging_database_url=None,
+    staging_ttl_seconds=86400,
+    cmdb_database_url=None,
+):
     initialize_cmdb_database(database_path)
+    if cmdb_database_url:
+        initialize_postgres_cmdb(cmdb_database_url, database_path)
     if staging_database_url:
         initialize_staging_database(staging_database_url)
     database_path = Path(database_path)
@@ -387,8 +459,16 @@ def make_handler(database_path, staging_database_url=None, staging_ttl_seconds=8
             try:
                 connection = sqlite3.connect(database_path)
                 connection.execute("SELECT 1 FROM cmdb_files LIMIT 1").fetchone()
-                self.send_json(200, {"status": "ok"})
-            except sqlite3.Error as error:
+                health = {
+                    "status": "ok",
+                    "cmdb_storage": "postgresql" if cmdb_database_url else "sqlite",
+                }
+                if cmdb_database_url:
+                    with psycopg.connect(cmdb_database_url, connect_timeout=5) as postgres:
+                        postgres.execute("SELECT 1 FROM cmdb_source_files LIMIT 1")
+                    health["postgres"] = "ok"
+                self.send_json(200, health)
+            except (sqlite3.Error, psycopg.Error) as error:
                 self.log_error("API health check failed: %s", error)
                 self.send_json(500, {"status": "error", "error": "Database CMDB tidak tersedia"})
             finally:
@@ -398,20 +478,37 @@ def make_handler(database_path, staging_database_url=None, staging_ttl_seconds=8
         def get_cmdb_status(self):
             connection = None
             try:
+                if cmdb_database_url:
+                    with psycopg.connect(cmdb_database_url, connect_timeout=10) as postgres:
+                        row = postgres.execute(
+                            "SELECT name, size, updated_at FROM cmdb_source_files WHERE id = 1"
+                        ).fetchone()
+                    if row is None:
+                        self.send_json(200, {"exists": False, "storage": "postgresql"})
+                        return
+                    self.send_json(200, {
+                        "exists": True,
+                        "name": row[0],
+                        "size": row[1],
+                        "updated_at": row[2],
+                        "storage": "postgresql",
+                    })
+                    return
                 connection = sqlite3.connect(database_path)
                 row = connection.execute(
                     "SELECT name, size, updated_at FROM cmdb_files WHERE id = 1"
                 ).fetchone()
                 if row is None:
-                    self.send_json(200, {"exists": False})
+                    self.send_json(200, {"exists": False, "storage": "sqlite"})
                     return
                 self.send_json(200, {
                     "exists": True,
                     "name": row[0],
                     "size": row[1],
                     "updated_at": row[2],
+                    "storage": "sqlite",
                 })
-            except sqlite3.Error as error:
+            except (sqlite3.Error, psycopg.Error) as error:
                 self.log_error("CMDB status query failed: %s", error)
                 self.send_json(500, {"error": "Gagal membaca status CMDB"})
             finally:
@@ -423,6 +520,25 @@ def make_handler(database_path, staging_database_url=None, staging_ttl_seconds=8
             blob = None
             response_started = False
             try:
+                if cmdb_database_url:
+                    with psycopg.connect(cmdb_database_url, connect_timeout=10) as postgres:
+                        row = postgres.execute(
+                            "SELECT name, size, content FROM cmdb_source_files WHERE id = 1"
+                        ).fetchone()
+                    if row is None:
+                        self.send_json(404, {"error": "CMDB belum tersimpan di server"})
+                        return
+                    name, size, content = row
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/octet-stream")
+                    self.send_header("Content-Length", str(size))
+                    self.send_header("Content-Disposition", f'attachment; filename="{name}"')
+                    self.send_header("Cache-Control", "no-store")
+                    self.end_headers()
+                    response_started = True
+                    for offset in range(0, len(content), 1024 * 1024):
+                        self.wfile.write(content[offset:offset + 1024 * 1024])
+                    return
                 connection = sqlite3.connect(database_path)
                 row = connection.execute(
                     "SELECT id, name, size FROM cmdb_files WHERE id = 1"
@@ -441,7 +557,7 @@ def make_handler(database_path, staging_database_url=None, staging_ttl_seconds=8
                 response_started = True
                 while chunk := blob.read(1024 * 1024):
                     self.wfile.write(chunk)
-            except (OSError, sqlite3.Error) as error:
+            except (OSError, sqlite3.Error, psycopg.Error) as error:
                 self.log_error("CMDB download failed: %s", error)
                 if not response_started:
                     self.send_json(500, {"error": "Gagal membaca file CMDB server"})
@@ -476,6 +592,13 @@ def make_handler(database_path, staging_database_url=None, staging_ttl_seconds=8
                         remaining -= len(chunk)
 
                 updated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+                if cmdb_database_url:
+                    content = temporary_path.read_bytes()
+                    status, result = store_cmdb_in_postgres(
+                        cmdb_database_url, action, filename, content, updated_at
+                    )
+                    self.send_json(status, result)
+                    return
                 connection = sqlite3.connect(database_path, timeout=30)
                 connection.execute("PRAGMA synchronous=FULL")
                 connection.execute("BEGIN IMMEDIATE")
@@ -514,7 +637,7 @@ def make_handler(database_path, staging_database_url=None, staging_ttl_seconds=8
                     "size": content_length,
                     "updated_at": updated_at,
                 })
-            except (OSError, sqlite3.Error) as error:
+            except (OSError, sqlite3.Error, psycopg.Error) as error:
                 if connection is not None:
                     connection.rollback()
                 self.log_error("CMDB save failed: %s", error)
@@ -667,7 +790,9 @@ def make_handler(database_path, staging_database_url=None, staging_ttl_seconds=8
 def main():
     database_path = os.environ.get("CMDB_DATABASE_PATH", "/data/cmdb.sqlite3")
     port = int(os.environ.get("PORT", "8000"))
-    staging_database_url = os.environ.get("DATABASE_URL")
+    default_database_url = os.environ.get("DATABASE_URL")
+    staging_database_url = os.environ.get("CMDB_STAGING_DATABASE_URL", default_database_url)
+    cmdb_database_url = os.environ.get("CMDB_DATABASE_URL", default_database_url)
     try:
         staging_ttl_seconds = int(os.environ.get("CMDB_STAGING_TTL_SECONDS", "86400"))
     except ValueError as error:
@@ -676,7 +801,12 @@ def main():
         raise RuntimeError("CMDB_STAGING_TTL_SECONDS harus antara 60 dan 2592000")
     server = ThreadingHTTPServer(
         ("0.0.0.0", port),
-        make_handler(database_path, staging_database_url, staging_ttl_seconds),
+        make_handler(
+            database_path,
+            staging_database_url,
+            staging_ttl_seconds,
+            cmdb_database_url,
+        ),
     )
     if staging_database_url:
         start_staging_cleanup_worker(staging_database_url)

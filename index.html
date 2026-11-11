@@ -931,9 +931,12 @@ async function refreshCMDBServerStatus() {
     const response = await cmdbServerFetch('/api/cmdb');
     const result = await response.json();
     cmdbServerHasSource = result.exists;
+    const storage = result.storage === 'postgresql' ? 'PostgreSQL' : 'server';
     status.textContent = result.exists
-      ? `Server: ${result.name} · ${fmtBytes(result.size)} · diperbarui ${result.updated_at}`
-      : 'Database CMDB server belum tersimpan.';
+      ? `${storage}: ${result.name} · ${fmtBytes(result.size)} · diperbarui ${result.updated_at}`
+      : result.storage === 'postgresql'
+        ? 'PostgreSQL terhubung; CMDB belum tersimpan.'
+        : 'Database CMDB server belum tersimpan.';
   } catch (error) {
     cmdbServerHasSource = false;
     status.textContent = `Database CMDB server tidak tersedia: ${error.message}`;
