@@ -12,6 +12,8 @@ Script membangun image Nginx dan Python API dari source terbaru, lalu menjalanka
 
 Saat halaman dibuka, menu awal menyediakan tautan **Yuk Bikin POT**, **POT Automated**, dan **Excel Compiler**. Tema default menggunakan palet warna sejuk; preferensi mode terang/gelap dapat diubah melalui tombol tema. Inter dan Space Grotesk dimuat dari Google Fonts CDN untuk tipografi; jika CDN tidak tersedia, font sistem digunakan sebagai fallback.
 
+Dashboard POT Automated menampilkan sapaan sesuai waktu setempat, cuaca terkini Jakarta, dan headline telekomunikasi, teknologi, serta finansial Indonesia. Tombol **Lokasi saya** meminta izin browser secara eksplisit; tanpa izin cuaca tetap memakai Jakarta. Cuaca diambil dari Open-Meteo dan berita dari Google News RSS melalui API backend, dilengkapi atribusi dan tautan ke penerbit. Kedua panel diperbarui berkala; bila layanan online tidak tersedia, UI menampilkan status kegagalan dan tools utama tetap dapat digunakan.
+
 ## Excel Compiler
 
 Pilih **Excel Compiler** pada menu awal untuk menggabungkan 2 sampai 20 file `.xlsx`, `.xls`, atau `.csv` menjadi tepat satu sheet. File `.xlsx` tidak wajib: bila tersedia, urutan kolom dan format mengikuti file XLSX pertama; jika tidak, urutan kolom mengikuti file pertama dan workbook XLSX baru dibuat. Baris dari file lain dipetakan berdasarkan header (tidak peka kapitalisasi dan spasi). Header yang berbeda, duplikat, atau kosong ditolak agar nilai tidak bergeser. Antarmuka mendukung pilih file dan drag-and-drop, menampilkan status kesiapan API serta penggunaan batas ukuran upload, dan mengunci daftar file selama proses kompilasi. Batas total upload adalah 500 MiB. Upload dan workbook dibaca/ditulis bertahap melalui file sementara agar penggunaan memori tetap terkendali.

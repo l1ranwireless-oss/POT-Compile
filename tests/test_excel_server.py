@@ -71,6 +71,46 @@ class ExcelServerTests(unittest.TestCase):
                 "cmdb_storage": "sqlite",
             })
 
+    def test_news_feed_returns_attributed_https_headlines(self):
+        from excel_server import fetch_news_headlines
+
+        feed = b"""<?xml version="1.0"?>
+        <rss><channel>
+          <item><title>Telecom update</title><link>https://publisher.example/one</link>
+            <source>Publisher One</source><pubDate>Wed, 11 Nov 2026 20:00:00 GMT</pubDate></item>
+          <item><title>Skip insecure link</title><link>http://publisher.example/two</link>
+            <source>Publisher Two</source></item>
+          <item><title>Finance update</title><link>https://publisher.example/three</link>
+            <source>Publisher Three</source></item>
+        </channel></rss>"""
+        with patch("excel_server._news_cache", {"expires_at": 0, "items": None}), patch(
+            "excel_server.urllib.request.urlopen", return_value=io.BytesIO(feed)
+        ) as open_feed:
+            items = fetch_news_headlines()
+        self.assertEqual([item["title"] for item in items], ["Telecom update", "Finance update"])
+        self.assertEqual(items[0]["source"], "Publisher One")
+        self.assertTrue(all(item["url"].startswith("https://") for item in items))
+        self.assertEqual(open_feed.call_args.kwargs["timeout"], 8)
+
+    def test_news_endpoint_reports_upstream_failure(self):
+        from excel_server import make_handler
+
+        with patch("excel_server.fetch_news_headlines", side_effect=RuntimeError("Feed offline")):
+            handler = make_handler(self.database_path)
+            server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                with self.assertRaises(HTTPError) as raised:
+                    urlopen(f"http://127.0.0.1:{server.server_port}/api/briefing/news")
+                self.assertEqual(raised.exception.code, 502)
+                self.assertEqual(json.loads(raised.exception.read()), {"error": "Feed offline"})
+                raised.exception.close()
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join()
+
     def test_api_health_confirms_postgres_connection(self):
         from excel_server import make_handler
 

@@ -384,6 +384,42 @@
   .workflow-step:hover .workflow-number{transform:rotate(-5deg) scale(1.06);background:color-mix(in srgb,var(--accent-cyan) 12%,var(--bg-secondary))}
   .theme-toggle,.theme-button{transition:transform .2s ease,border-color .2s ease,background .3s ease,box-shadow .2s ease}
   :where(button,a,select,input,textarea,summary):focus-visible{outline-color:var(--accent-cyan)}
+  .briefing-grid{display:grid;grid-template-columns:minmax(0,.82fr) minmax(0,1.18fr);gap:14px;margin:0 0 20px}
+  .briefing-card{position:relative;min-width:0;padding:20px;border:1px solid var(--border-subtle);border-radius:18px;background:var(--bg-card);box-shadow:var(--shadow-card);overflow:hidden;animation:fadeInUp .5s ease-out both}
+  .briefing-card:nth-child(2){animation-delay:.1s}
+  .briefing-card h2{font:700 14px 'Space Grotesk','Inter',sans-serif;color:var(--text-primary)}
+  .briefing-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .briefing-caption{margin-top:4px;color:var(--text-muted);font-size:10px}
+  .briefing-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:34px;padding:7px 10px;border:1px solid var(--border-medium);border-radius:10px;background:var(--bg-input);color:var(--text-secondary);font:600 10px 'Inter',sans-serif;cursor:pointer;transition:transform .2s ease,border-color .2s ease,background .2s ease}
+  .briefing-button:hover{transform:translateY(-1px);border-color:var(--border-strong);background:var(--bg-elevated)}
+  .briefing-button:disabled{opacity:.55;cursor:wait;transform:none}
+  .weather-content{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:14px;margin-top:16px}
+  .weather-icon{position:relative;display:grid;place-items:center;width:68px;height:68px;border-radius:22px;background:color-mix(in srgb,var(--accent-orange) 12%,var(--bg-secondary));font-size:34px;animation:weather-float 4s ease-in-out infinite}
+  .weather-icon.rainy{background:color-mix(in srgb,var(--accent-blue) 13%,var(--bg-secondary));animation:weather-rain 1.8s ease-in-out infinite}
+  .weather-icon.cloudy,.weather-icon.foggy{background:color-mix(in srgb,var(--accent-blue) 9%,var(--bg-secondary));animation:weather-float 5s ease-in-out infinite}
+  .weather-icon.stormy{background:color-mix(in srgb,var(--accent-purple) 12%,var(--bg-secondary));animation:weather-storm 3s ease-in-out infinite}
+  @keyframes weather-float{50%{transform:translateY(-4px)}}
+  @keyframes weather-rain{50%{transform:translateY(3px)}}
+  @keyframes weather-storm{50%{filter:brightness(1.25);transform:translateY(-2px)}}
+  .weather-temperature{font:700 32px/1 'Space Grotesk','Inter',sans-serif;color:var(--text-primary);letter-spacing:-1.5px}
+  .weather-description{margin-top:5px;color:var(--text-secondary);font-size:12px;font-weight:600}
+  .weather-location{margin-top:3px;color:var(--text-muted);font-size:10px}
+  .weather-details{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}
+  .weather-detail{padding:6px 9px;border:1px solid var(--border-subtle);border-radius:9px;background:var(--bg-input);color:var(--text-secondary);font-size:10px}
+  .weather-status{min-height:14px;margin-top:10px;color:var(--text-muted);font-size:10px}
+  .news-list{display:grid;gap:0;margin:13px 0 0;padding:0;list-style:none}
+  .news-item{padding:10px 0;border-top:1px solid var(--border-subtle);animation:fadeInUp .3s ease-out both}
+  .news-item:first-child{border-top:0;padding-top:0}
+  .news-link{color:var(--text-primary);font-size:12px;line-height:1.45;font-weight:650;text-decoration:none}
+  .news-link:hover{color:var(--accent-cyan)}
+  .news-meta{display:flex;align-items:center;gap:7px;margin-top:4px;color:var(--text-muted);font-size:10px}
+  .news-source{color:var(--accent-cyan);font-weight:700}
+  .news-status{padding:15px 0;color:var(--text-secondary);font-size:11px;line-height:1.5}
+  .briefing-footer{margin-top:10px;color:var(--text-muted);font-size:9px;line-height:1.5}
+  .briefing-spinner{width:12px;height:12px;border:2px solid var(--border-medium);border-top-color:var(--accent-cyan);border-radius:50%;animation:spin .7s linear infinite}
+  @media(max-width:760px){.briefing-grid{grid-template-columns:1fr}}
+  @media(max-width:520px){.briefing-card{padding:16px}.briefing-heading{align-items:flex-start}.weather-icon{width:60px;height:60px}}
+  @media(prefers-reduced-motion:reduce){.weather-icon{animation:none!important}.briefing-card,.news-item{animation:none!important}}
   @media(prefers-reduced-motion:reduce){.orb{display:none}.upload-card:hover,.workflow-step:hover,.workflow-step:hover .workflow-number{transform:none}}
 </style>
 </head>
@@ -399,8 +435,8 @@
   <section class="welcome-dialog" role="dialog" aria-modal="true" aria-labelledby="welcome-title" aria-describedby="welcome-description">
     <div class="welcome-mark" aria-hidden="true">✦</div>
     <div class="welcome-kicker">WORKSPACE · AUTOMATION TOOLS</div>
-    <h2 id="welcome-title">Pilih tools</h2>
-    <p id="welcome-description">Pilih aplikasi yang ingin Anda gunakan.</p>
+    <h2 id="welcome-title">Selamat datang</h2>
+    <p id="welcome-description">Semoga aktivitas Anda lancar. Pilih tools yang ingin digunakan.</p>
     <div class="welcome-options">
       <a class="welcome-choice" id="welcome-yuk-pot" href="https://l1ranwireless-oss.github.io/POT_Biasa" target="_blank" rel="noopener noreferrer">
         <span class="welcome-choice-icon" aria-hidden="true">🧭</span>
@@ -431,8 +467,31 @@
     <div class="welcome-kicker">POT AUTOMATION WORKSPACE</div>
     <h1>Compiler Data POT</h1>
     <p>Gunakan file <b>POT + CMDB</b>; sheet segmentation akan dibuat otomatis.</p>
-    <p><b>BCP workflow</b> · Validasi, kompilasi, dan ringkasan insiden dalam satu tempat.</p>
+    <p id="greeting-line"><b>BCP workflow</b> · Selamat datang di workspace Anda.</p>
   </div>
+
+  <section class="briefing-grid" aria-label="Informasi terbaru">
+    <article class="briefing-card weather-card" aria-labelledby="weather-heading">
+      <div class="briefing-heading">
+        <div><h2 id="weather-heading">Cuaca hari ini</h2><p class="briefing-caption">Kondisi terkini dari Open-Meteo</p></div>
+        <button class="briefing-button" id="weather-location-button" type="button" title="Gunakan lokasi perangkat"><span aria-hidden="true">⌖</span> Lokasi saya</button>
+      </div>
+      <div class="weather-content">
+        <div class="weather-icon" id="weather-icon" aria-hidden="true">☀️</div>
+        <div><div class="weather-temperature" id="weather-temperature">--°</div><div class="weather-description" id="weather-description">Memuat kondisi cuaca...</div><div class="weather-location" id="weather-location">Jakarta, Indonesia</div></div>
+      </div>
+      <div class="weather-details"><span class="weather-detail" id="weather-feels">Terasa seperti --°</span><span class="weather-detail" id="weather-humidity">Kelembapan --%</span><span class="weather-detail" id="weather-wind">Angin -- km/j</span></div>
+      <div class="weather-status" id="weather-status" role="status" aria-live="polite">Menghubungkan ke layanan cuaca...</div>
+    </article>
+    <article class="briefing-card news-card" aria-labelledby="news-heading">
+      <div class="briefing-heading">
+        <div><h2 id="news-heading">Berita pilihan</h2><p class="briefing-caption">Telekomunikasi · Teknologi · Finansial · Indonesia</p></div>
+        <button class="briefing-button" id="news-refresh-button" type="button"><span aria-hidden="true">↻</span> Perbarui</button>
+      </div>
+      <ul class="news-list" id="news-list" aria-live="polite"><li class="news-status">Mengambil headline terbaru...</li></ul>
+      <p class="briefing-footer" id="news-footer">Headline dan sumber dikutip dari Google News RSS. Buka tautan untuk membaca artikel dari penerbit.</p>
+    </article>
+  </section>
 
   <div class="workflow-guide" aria-label="Alur penggunaan">
     <div class="workflow-step"><span class="workflow-number">01</span><span><strong>Unggah sumber</strong><small>POT dan CMDB wajib; ZIP Power Alarm opsional.</small></span></div>
@@ -2719,6 +2778,165 @@ async function restoreCMDBSourceOnStartup() {
   }
 }
 restoreCMDBSourceOnStartup();
+</script>
+<script>
+(() => {
+  const weatherApi = 'https://api.open-meteo.com/v1/forecast';
+  const jakarta = {latitude:-6.2088, longitude:106.8456, label:'Jakarta, Indonesia'};
+  const weatherButton = document.getElementById('weather-location-button');
+  const weatherStatus = document.getElementById('weather-status');
+  const newsButton = document.getElementById('news-refresh-button');
+  const newsList = document.getElementById('news-list');
+  let activeWeatherLocation = jakarta;
+
+  function setGreeting() {
+    const hour = new Date().getHours();
+    const greeting = hour < 11 ? 'Selamat pagi' : hour < 15 ? 'Selamat siang' : hour < 18 ? 'Selamat sore' : 'Selamat malam';
+    document.getElementById('welcome-title').textContent = `${greeting}, selamat datang`;
+    const greetingLine = document.getElementById('greeting-line');
+    const emphasis = document.createElement('b');
+    emphasis.textContent = `${greeting}!`;
+    greetingLine.replaceChildren(emphasis, document.createTextNode(' BCP workflow · Validasi, kompilasi, dan ringkasan insiden dalam satu tempat.'));
+  }
+
+  function describeWeather(code) {
+    if (code === 0) return ['Cerah', 'sunny', '☀️'];
+    if (code === 1) return ['Cerah berawan', 'partly-cloudy', '🌤️'];
+    if (code === 2) return ['Berawan sebagian', 'partly-cloudy', '⛅'];
+    if (code === 3) return ['Berawan', 'cloudy', '☁️'];
+    if (code === 45 || code === 48) return ['Berkabut', 'foggy', '🌫️'];
+    if ([51,53,55,56,57].includes(code)) return ['Gerimis', 'rainy', '🌦️'];
+    if ([61,63,65,66,67,80,81,82].includes(code)) return ['Hujan', 'rainy', '🌧️'];
+    if ([71,73,75,77,85,86].includes(code)) return ['Salju', 'cloudy', '🌨️'];
+    if ([95,96,99].includes(code)) return ['Hujan petir', 'stormy', '⛈️'];
+    return ['Cuaca berubah-ubah', 'cloudy', '🌥️'];
+  }
+
+  async function loadWeather(location) {
+    activeWeatherLocation = location;
+    const icon = document.getElementById('weather-icon');
+    weatherStatus.textContent = 'Memperbarui kondisi cuaca...';
+    weatherButton.disabled = true;
+    try {
+      const query = new URLSearchParams({
+        latitude:String(location.latitude),
+        longitude:String(location.longitude),
+        current:'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m',
+        timezone:'auto',
+      });
+      const response = await fetch(`${weatherApi}?${query}`, {cache:'no-store', signal:AbortSignal.timeout(10000)});
+      if (!response.ok) throw new Error(`Layanan cuaca merespons ${response.status}`);
+      const result = await response.json();
+      const current = result.current;
+      if (!current || !Number.isFinite(current.temperature_2m)) throw new Error('Data cuaca belum tersedia');
+      const [description, animation, symbol] = describeWeather(current.weather_code);
+      icon.textContent = symbol;
+      icon.className = `weather-icon ${animation}${current.is_day ? '' : ' night'}`;
+      document.getElementById('weather-temperature').textContent = `${Math.round(current.temperature_2m)}°`;
+      document.getElementById('weather-description').textContent = description;
+      document.getElementById('weather-location').textContent = location.label;
+      document.getElementById('weather-feels').textContent = `Terasa seperti ${Math.round(current.apparent_temperature)}°`;
+      document.getElementById('weather-humidity').textContent = `Kelembapan ${Math.round(current.relative_humidity_2m)}%`;
+      document.getElementById('weather-wind').textContent = `Angin ${Math.round(current.wind_speed_10m)} km/j`;
+      const observedAt = current.time ? new Date(current.time.replace(' ', 'T')) : new Date();
+      weatherStatus.textContent = `Data diperbarui ${observedAt.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'})} waktu setempat.`;
+    } catch (error) {
+      weatherStatus.textContent = `Cuaca online belum tersedia: ${error.message}`;
+    } finally {
+      weatherButton.disabled = false;
+    }
+  }
+
+  function formatNewsDate(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString('id-ID', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+  }
+
+  async function loadNews() {
+    newsButton.disabled = true;
+    newsButton.innerHTML = '<span class="briefing-spinner" aria-hidden="true"></span> Memuat';
+    newsList.replaceChildren();
+    const loadingItem = document.createElement('li');
+    loadingItem.className = 'news-status';
+    loadingItem.textContent = 'Mengambil headline terbaru...';
+    newsList.append(loadingItem);
+    try {
+      const response = await fetch('/api/briefing/news', {cache:'no-store', signal:AbortSignal.timeout(12000)});
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || `Server merespons ${response.status}`);
+      if (!Array.isArray(result.items) || !result.items.length) throw new Error('Belum ada headline yang tersedia');
+      newsList.replaceChildren();
+      result.items.forEach((item, index) => {
+        const row = document.createElement('li');
+        row.className = 'news-item';
+        row.style.animationDelay = `${Math.min(index, 6) * 45}ms`;
+        const link = document.createElement('a');
+        link.className = 'news-link';
+        link.href = item.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = item.title;
+        const meta = document.createElement('div');
+        meta.className = 'news-meta';
+        const source = document.createElement('span');
+        source.className = 'news-source';
+        source.textContent = item.source || 'Sumber berita';
+        meta.append(source);
+        const published = formatNewsDate(item.published);
+        if (published) {
+          const date = document.createElement('time');
+          date.dateTime = item.published;
+          date.textContent = published;
+          meta.append(date);
+        }
+        row.append(link, meta);
+        newsList.append(row);
+      });
+      const updated = result.updated_at ? new Date(result.updated_at) : new Date();
+      document.getElementById('news-footer').textContent =
+        `Diperbarui ${updated.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'})} · Headline Google News RSS; artikel dibuka di situs penerbit.`;
+    } catch (error) {
+      newsList.replaceChildren();
+      const message = document.createElement('li');
+      message.className = 'news-status';
+      message.textContent = `Berita online belum tersedia: ${error.message}`;
+      newsList.append(message);
+    } finally {
+      newsButton.disabled = false;
+      newsButton.innerHTML = '<span aria-hidden="true">↻</span> Perbarui';
+    }
+  }
+
+  weatherButton.addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      weatherStatus.textContent = 'Browser ini tidak mendukung lokasi perangkat. Menampilkan cuaca Jakarta.';
+      return;
+    }
+    weatherButton.disabled = true;
+    weatherStatus.textContent = 'Menunggu izin lokasi perangkat...';
+    navigator.geolocation.getCurrentPosition(
+      position => loadWeather({
+        latitude:position.coords.latitude,
+        longitude:position.coords.longitude,
+        label:'Lokasi sekitar perangkat',
+      }),
+      error => {
+        weatherButton.disabled = false;
+        weatherStatus.textContent = error.code === error.PERMISSION_DENIED
+          ? 'Izin lokasi tidak diberikan. Cuaca tetap menggunakan Jakarta.'
+          : 'Lokasi tidak dapat ditentukan. Cuaca tetap menggunakan Jakarta.';
+      },
+      {enableHighAccuracy:false, timeout:10000, maximumAge:600000},
+    );
+  });
+  newsButton.addEventListener('click', loadNews);
+  setGreeting();
+  loadWeather(jakarta);
+  loadNews();
+  window.setInterval(loadNews, 15 * 60 * 1000);
+  window.setInterval(() => loadWeather(activeWeatherLocation), 20 * 60 * 1000);
+})();
 </script>
 </body>
 </html>

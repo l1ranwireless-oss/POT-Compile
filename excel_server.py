@@ -8,10 +8,13 @@ import sqlite3
 import tempfile
 import threading
 import time
+import urllib.error
+import urllib.request
 import uuid
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from xml.etree import ElementTree
 from urllib.parse import unquote
 
 import psycopg
@@ -30,6 +33,61 @@ MAX_STAGING_SESSION_BYTES = 256 * 1024 * 1024
 CMDB_ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".csv"}
 LEGACY_GENERATION_PATTERN = re.compile(r"^[a-f0-9]{32}\.bin$")
 STAGING_UUID_PATTERN = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+NEWS_FEED_URL = (
+    "https://news.google.com/rss/search?q="
+    "telekomunikasi+OR+teknologi+OR+keuangan+Indonesia"
+    "&hl=id&gl=ID&ceid=ID:id"
+)
+NEWS_FEED_MAX_BYTES = 1024 * 1024
+_news_cache = {"expires_at": 0, "items": None}
+_news_cache_lock = threading.Lock()
+
+
+def fetch_news_headlines():
+    with _news_cache_lock:
+        if _news_cache["items"] is not None and _news_cache["expires_at"] > time.monotonic():
+            return _news_cache["items"]
+
+    request = urllib.request.Request(
+        NEWS_FEED_URL,
+        headers={"User-Agent": "POT-Compile/1.0 (news headlines; contact: project maintainers)"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=8) as response:
+            payload = response.read(NEWS_FEED_MAX_BYTES + 1)
+    except (OSError, urllib.error.URLError, TimeoutError) as error:
+        raise RuntimeError("Sumber berita online tidak dapat dihubungi") from error
+    if len(payload) > NEWS_FEED_MAX_BYTES:
+        raise RuntimeError("Respons berita online melebihi batas ukuran")
+    try:
+        root = ElementTree.fromstring(payload)
+    except ElementTree.ParseError as error:
+        raise RuntimeError("Format berita online tidak valid") from error
+
+    items = []
+    seen = set()
+    for entry in root.findall("./channel/item"):
+        title = (entry.findtext("title") or "").strip()
+        link = (entry.findtext("link") or "").strip()
+        source = (entry.findtext("source") or "Google News").strip()
+        published = (entry.findtext("pubDate") or "").strip()
+        if not title or not link.startswith("https://") or link in seen:
+            continue
+        seen.add(link)
+        items.append({
+            "title": title,
+            "source": source[:120],
+            "url": link,
+            "published": published[:100],
+        })
+        if len(items) == 8:
+            break
+    if not items:
+        raise RuntimeError("Belum ada headline berita yang tersedia")
+
+    with _news_cache_lock:
+        _news_cache.update(expires_at=time.monotonic() + 300, items=items)
+    return items
 
 
 def safe_cmdb_filename(value):
@@ -298,6 +356,9 @@ def make_handler(
             self.send_json(404, {"error": "Endpoint tidak ditemukan"})
 
         def do_GET(self):
+            if self.path == "/api/briefing/news":
+                self.get_news_headlines()
+                return
             if self.path == "/api/health":
                 self.get_health()
                 return
@@ -311,6 +372,16 @@ def make_handler(
                 self.get_staging_status()
                 return
             self.send_json(404, {"error": "Endpoint tidak ditemukan"})
+
+        def get_news_headlines(self):
+            try:
+                self.send_json(200, {
+                    "items": fetch_news_headlines(),
+                    "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                })
+            except RuntimeError as error:
+                self.log_error("News briefing request failed: %s", error)
+                self.send_json(502, {"error": str(error)})
 
         def do_PUT(self):
             if self.path == "/api/cmdb/update":
