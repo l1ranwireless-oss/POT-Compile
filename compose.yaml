@@ -5,7 +5,9 @@ services:
       dockerfile: Dockerfile.api
     restart: unless-stopped
     environment:
-      EXCEL_API_TOKEN: "${EXCEL_API_TOKEN:?Set EXCEL_API_TOKEN before deployment}"
+      CMDB_DATABASE_PATH: /data/cmdb.sqlite3
+    volumes:
+      - cmdb_data:/data
   web:
     build: .
     restart: unless-stopped
@@ -13,3 +15,6 @@ services:
       - excel-api
     ports:
       - "127.0.0.1:${PORT:-8080}:80"
+
+volumes:
+  cmdb_data:

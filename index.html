@@ -122,6 +122,10 @@
   .file-info .warn-tag{color:var(--accent-orange);font-size:10px;font-weight:600;margin-top:2px}
   .file-info .remove{position:absolute;right:8px;top:8px;color:var(--accent-red);cursor:pointer;font-size:10px;font-weight:700;background:var(--bg-card);padding:3px 8px;border-radius:6px;border:1px solid rgba(255,56,96,.3);transition:all .2s}
   .file-info .remove:hover{background:var(--accent-red);color:#fff}
+  .cmdb-server-controls{display:grid;gap:8px;margin-top:12px}
+  .cmdb-server-actions{display:flex;gap:6px;flex-wrap:wrap}
+  .cmdb-server-actions .btn-small{flex:1 1 90px}
+  .cmdb-server-status{font-size:10px;color:var(--text-secondary);line-height:1.5}
   .cmdb-badge{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:10px;font-size:11px;font-family:'JetBrains Mono',monospace;margin-bottom:16px;transition:all .3s;animation:fadeInUp .6s ease-out .5s both}
   .cmdb-badge.loaded{background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.3);color:var(--accent-green)}
   .cmdb-badge.empty{background:var(--bg-input);border:1px solid var(--border-subtle);color:var(--text-muted)}
@@ -383,7 +387,7 @@
 
     <div class="upload-card cmdb">
       <h2>🟡 CMDB (Sheet "Site") <span class="badge yellow">WAJIB</span></h2>
-      <div class="desc">Database lokal otomatis · header detection · data referensi</div>
+      <div class="desc">Database lokal otomatis · simpan CMDB ke database server</div>
       <label class="drop-zone" id="dz-cmdb">
         <input type="file" id="file-cmdb" accept=".xlsx,.xls,.csv">
         <div class="icon">📙</div>
@@ -395,6 +399,14 @@
         <div class="name" id="name-cmdb"></div>
         <div class="meta" id="meta-cmdb"></div>
         <div class="warn-tag" id="warn-cmdb"></div>
+      </div>
+      <div class="cmdb-server-controls">
+        <div class="cmdb-server-actions">
+          <button class="btn-small" id="btn-cmdb-load" type="button" onclick="loadCMDBFromServer()" disabled>Muat Server</button>
+          <button class="btn-small" id="btn-cmdb-save" type="button" onclick="saveCMDBToServer()" disabled>Simpan CMDB</button>
+          <button class="btn-small" id="btn-cmdb-update" type="button" onclick="updateCMDBOnServer()" disabled>Update Server</button>
+        </div>
+        <div class="cmdb-server-status" id="cmdb-server-status">Memeriksa database CMDB server...</div>
       </div>
     </div>
 
@@ -607,6 +619,7 @@ const FONT_BLACK = '000000', FONT_WHITE = 'FFFFFF';
 let potFile = null, segFile = null, cmdbFile = null, zipFile = null;
 let lastOutputBlob = null;
 let processing = false, cmdbLoading = false;
+let cmdbServerHasSource = false, cmdbServerBusy = false;
 const logLines = [];
 
 /* ═══════════════ CMDB CACHE ═══════════════ */
@@ -641,7 +654,7 @@ function incrementStats(stats, hub, cls, hasDG) {
   if (isCrit) { stats.critical++; if (hasDG) stats.criticalDG++; else stats.criticalNoDG++; }
 }
 function clearCMDB(options = {}) {
-  if (options.deleteStored && (cmdbLoading || processing)) { toast('Tunggu proses yang sedang berjalan selesai', 'warn'); return; }
+  if (options.deleteStored && (cmdbLoading || processing || cmdbServerBusy)) { toast('Tunggu proses yang sedang berjalan selesai', 'warn'); return; }
   if (options.deleteStored) {
     cmdbFile = null;
     const input = document.getElementById('file-cmdb');
@@ -660,6 +673,7 @@ function clearCMDB(options = {}) {
   CMDB_CACHE.meta = { rows:0, cols:0, chunks:0, processed:0, skipped:0, sites:0, mcCount:0, loadedAt:null, loadedAtISO:null, signature:null, sheetName:null, headerIdx:null, normalized:null, criticalMissing:[], sourceStored:false };
   if (had > 0) log(`🗑️ CMDB cache cleared (was: ${had} sites)`);
   updateCMDBBadge();
+  updateCMDBServerButtons();
   if (options.deleteStored) deleteCMDBSource().catch(e => toast('Database CMDB gagal dihapus: ' + e.message, 'error'));
   try { if (window.gc) window.gc(); } catch (e) {}
   if (options.deleteStored) checkReady();
@@ -762,6 +776,94 @@ async function deleteCMDBSource() {
     tx.oncomplete = () => { db.close(); resolve(); };
     tx.onerror = () => { db.close(); reject(tx.error || new Error('Sumber CMDB gagal dihapus')); };
   });
+}
+function updateCMDBServerButtons() {
+  const hasLocalSource = !!cmdbFile && CMDB_CACHE.meta.sites > 0;
+  document.getElementById('btn-cmdb-load').disabled = !cmdbServerHasSource || cmdbServerBusy || processing || cmdbLoading;
+  document.getElementById('btn-cmdb-save').disabled = !hasLocalSource || cmdbServerHasSource || cmdbServerBusy || processing || cmdbLoading;
+  document.getElementById('btn-cmdb-update').disabled = !hasLocalSource || !cmdbServerHasSource || cmdbServerBusy || processing || cmdbLoading;
+}
+async function cmdbServerFetch(path, options = {}) {
+  const response = await fetch(path, options);
+  if (!response.ok) {
+    let message = `Server CMDB merespons ${response.status}`;
+    const body = await response.text();
+    try {
+      const result = JSON.parse(body);
+      if (result.error) message = result.error;
+    } catch (error) {
+      if (body) message += ': ' + body.slice(0, 160);
+    }
+    throw new Error(message);
+  }
+  return response;
+}
+async function refreshCMDBServerStatus() {
+  const status = document.getElementById('cmdb-server-status');
+  status.textContent = 'Memeriksa database CMDB server...';
+  try {
+    const response = await cmdbServerFetch('/api/cmdb');
+    const result = await response.json();
+    cmdbServerHasSource = result.exists;
+    status.textContent = result.exists
+      ? `Server: ${result.name} · ${fmtBytes(result.size)} · diperbarui ${result.updated_at}`
+      : 'Database CMDB server belum tersimpan.';
+  } catch (error) {
+    cmdbServerHasSource = false;
+    status.textContent = `Database CMDB server tidak tersedia: ${error.message}`;
+  }
+  updateCMDBServerButtons();
+}
+async function uploadCMDBToServer(action) {
+  if (!cmdbFile || CMDB_CACHE.meta.sites === 0) throw new Error('Muat dan validasi file CMDB terlebih dahulu');
+  cmdbServerBusy = true;
+  updateCMDBServerButtons();
+  document.getElementById('cmdb-server-status').textContent = 'Menyimpan CMDB ke database server...';
+  try {
+    const response = await cmdbServerFetch(`/api/cmdb/${action}`, {
+      method: action === 'save' ? 'POST' : 'PUT',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'X-CMDB-Filename': encodeURIComponent(cmdbFile.name)
+      },
+      body: cmdbFile
+    });
+    const result = await response.json();
+    cmdbServerHasSource = true;
+    document.getElementById('cmdb-server-status').textContent =
+      `Server: ${result.name} · ${fmtBytes(result.size)} · diperbarui ${result.updated_at}`;
+    toast(action === 'save' ? '✅ CMDB tersimpan di database server' : '✅ Database CMDB server diperbarui', 'success');
+  } catch (error) {
+    document.getElementById('cmdb-server-status').textContent = `Simpan CMDB gagal: ${error.message}`;
+    toast(`❌ Simpan CMDB gagal: ${error.message}`, 'error');
+    await refreshCMDBServerStatus();
+  } finally {
+    cmdbServerBusy = false;
+    updateCMDBServerButtons();
+  }
+}
+async function saveCMDBToServer() {
+  await uploadCMDBToServer('save');
+}
+async function updateCMDBOnServer() {
+  await uploadCMDBToServer('update');
+}
+async function loadCMDBFromServer() {
+  cmdbServerBusy = true;
+  updateCMDBServerButtons();
+  try {
+    const response = await cmdbServerFetch('/api/cmdb/file');
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const filename = disposition.match(/filename="([^"]+)"/)?.[1] || 'cmdb.xlsx';
+    setFile('cmdb', new File([blob], filename, {type: blob.type || 'application/octet-stream'}));
+  } catch (error) {
+    document.getElementById('cmdb-server-status').textContent = `Muat CMDB gagal: ${error.message}`;
+    toast(`❌ Muat CMDB gagal: ${error.message}`, 'error');
+  } finally {
+    cmdbServerBusy = false;
+    updateCMDBServerButtons();
+  }
 }
 async function prepareCMDBDatabase(file) {
   if (!await ensureXLSX()) throw new Error('Library Excel gagal dimuat. Periksa koneksi internet.');
@@ -1152,6 +1254,7 @@ function setFile(key, file) {
   if (!validExt) { toast(key === 'zip' ? 'Harus file .zip' : 'Format harus .xlsx / .xls / .csv', 'error'); return; }
   if (processing) { toast('Tunggu kompilasi selesai sebelum mengganti file', 'warn'); return; }
   if (key === 'cmdb' && cmdbLoading) { toast('Tunggu proses membaca CMDB selesai', 'warn'); return; }
+  if (key === 'cmdb' && cmdbServerBusy) { toast('Tunggu proses server CMDB selesai', 'warn'); return; }
   if (key === 'pot') potFile = file;
   else if (key === 'seg') segFile = file;
   else if (key === 'cmdb') { cmdbFile = file; clearCMDB(); cmdbLoading = true; log(`🆕 Membaca CMDB dan membuat database lokal`); }
@@ -1181,14 +1284,14 @@ function setFile(key, file) {
       }
       log('❌ CMDB gagal dimuat: ' + e.message);
       toast('❌ CMDB gagal dimuat: ' + e.message, 'error');
-    }).finally(() => { cmdbLoading = false; checkReady(); });
+    }).finally(() => { cmdbLoading = false; checkReady(); updateCMDBServerButtons(); });
   } else {
     toast(`✅ ${file.name} dimuat`, 'success');
     checkReady();
   }
 }
 function clearFile(key) {
-  if (processing || (key === 'cmdb' && cmdbLoading)) { toast('Tunggu proses yang sedang berjalan selesai', 'warn'); return; }
+  if (processing || (key === 'cmdb' && (cmdbLoading || cmdbServerBusy))) { toast('Tunggu proses yang sedang berjalan selesai', 'warn'); return; }
   if (key === 'pot') { potFile = null; document.getElementById('file-pot').value = ''; }
   else if (key === 'seg') { segFile = null; document.getElementById('file-seg').value = ''; }
   else if (key === 'cmdb') { cmdbFile = null; document.getElementById('file-cmdb').value = ''; clearCMDB({deleteStored:true}); }
@@ -2415,7 +2518,7 @@ function downloadLog() {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 function resetAll() {
-  if (processing || cmdbLoading) { toast('Tunggu proses yang sedang berjalan selesai', 'warn'); return; }
+  if (processing || cmdbLoading || cmdbServerBusy) { toast('Tunggu proses yang sedang berjalan selesai', 'warn'); return; }
   potFile = null; segFile = null; cmdbFile = null; zipFile = null; lastOutputBlob = null;
   ['file-pot','file-seg','file-cmdb','file-zip'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
   ['info-pot','info-seg','info-cmdb','info-zip'].forEach(id => document.getElementById(id).classList.remove('show'));
@@ -2435,9 +2538,11 @@ bindDrop('dz-pot','file-pot','pot');
 bindDrop('dz-seg','file-seg','seg');
 bindDrop('dz-cmdb','file-cmdb','cmdb');
 bindDrop('dz-zip','file-zip','zip');
+updateCMDBServerButtons();
 CMDB_CACHE.globalStats = emptyStats('ALL');
 updateCMDBBadge();
 log('Aplikasi siap · Summary Report-driven + CMDB fuzzy MC match');
+refreshCMDBServerStatus();
 async function restoreCMDBSourceOnStartup() {
   try {
     const stored = await getCMDBSource();
